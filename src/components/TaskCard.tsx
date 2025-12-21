@@ -1,0 +1,107 @@
+'use client';
+
+import { Project, Priority } from '@/types';
+
+interface TaskCardProps {
+  project: Project;
+  onClick: () => void;
+  onDragStart: (e: React.DragEvent, project: Project) => void;
+}
+
+const priorityColors: Record<Priority, { bg: string; text: string; border: string }> = {
+  low: { bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-300' },
+  medium: { bg: 'bg-yellow-100', text: 'text-yellow-700', border: 'border-yellow-300' },
+  high: { bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-300' },
+  urgent: { bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-300' },
+};
+
+const priorityLabels: Record<Priority, string> = {
+  low: 'Low',
+  medium: 'Medium',
+  high: 'High',
+  urgent: 'Urgent',
+};
+
+export default function TaskCard({ project, onClick, onDragStart }: TaskCardProps) {
+  const priority = priorityColors[project.priority] || priorityColors.medium;
+  const isOverdue = project.dueDate && new Date(project.dueDate) < new Date();
+
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return null;
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
+  return (
+    <div
+      draggable
+      onDragStart={(e) => onDragStart(e, project)}
+      onClick={onClick}
+      className={`bg-white rounded-lg shadow-sm border ${priority.border} p-3 cursor-pointer hover:shadow-md transition-shadow`}
+    >
+      {/* Title */}
+      <h4 className="font-medium text-gray-800 text-sm mb-2 line-clamp-2">
+        {project.title}
+      </h4>
+
+      {/* Description preview */}
+      {project.description && (
+        <p className="text-xs text-gray-500 mb-2 line-clamp-2">
+          {project.description}
+        </p>
+      )}
+
+      {/* Meta row */}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        {/* Priority badge */}
+        <span className={`text-xs px-2 py-0.5 rounded-full ${priority.bg} ${priority.text}`}>
+          {priorityLabels[project.priority]}
+        </span>
+
+        {/* Due date */}
+        {project.dueDate && (
+          <span className={`text-xs ${isOverdue ? 'text-red-600 font-medium' : 'text-gray-500'}`}>
+            {isOverdue ? 'Overdue: ' : ''}{formatDate(project.dueDate)}
+          </span>
+        )}
+      </div>
+
+      {/* Bottom row */}
+      <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
+        {/* Assignee */}
+        {project.assigneeName ? (
+          <div className="flex items-center gap-1">
+            <div className="w-5 h-5 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-medium">
+              {project.assigneeName.charAt(0).toUpperCase()}
+            </div>
+            <span className="text-xs text-gray-600 truncate max-w-[80px]">
+              {project.assigneeName}
+            </span>
+          </div>
+        ) : (
+          <span className="text-xs text-gray-400">Unassigned</span>
+        )}
+
+        {/* Comments & Attachments count */}
+        <div className="flex items-center gap-2">
+          {project.comments.length > 0 && (
+            <span className="text-xs text-gray-400 flex items-center gap-0.5">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+              {project.comments.length}
+            </span>
+          )}
+          {project.attachments.length > 0 && (
+            <span className="text-xs text-gray-400 flex items-center gap-0.5">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+              </svg>
+              {project.attachments.length}
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
