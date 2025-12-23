@@ -8,6 +8,7 @@ import DepartmentCard from '@/components/DepartmentCard';
 import UserSearchModal from '@/components/UserSearchModal';
 import KanbanBoard from '@/components/KanbanBoard';
 import PushNotificationPrompt from '@/components/PushNotificationPrompt';
+import NotificationBell from '@/components/NotificationBell';
 
 type Tab = 'departments' | 'users' | 'projects' | 'invites';
 
@@ -426,6 +427,7 @@ export default function DashboardPage() {
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
           <h1 className="text-xl font-bold text-gray-800">Dashboard - CCOAN New York</h1>
           <div className="flex items-center gap-4">
+            <NotificationBell token={token || ''} />
             <span className="text-sm text-gray-600">
               {user.name || user.email} {user.isSuperUser && <span className="text-blue-600">(SuperUser)</span>}
             </span>

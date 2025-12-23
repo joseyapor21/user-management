@@ -31,13 +31,27 @@ export async function registerServiceWorker(): Promise<ServiceWorkerRegistration
   }
 }
 
+// Fetch VAPID public key from server (runtime config)
+async function getVapidPublicKey(): Promise<string | null> {
+  try {
+    const res = await fetch('/api/config/vapid');
+    const data = await res.json();
+    if (data.success && data.publicKey) {
+      return data.publicKey;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export async function subscribeToPush(token: string): Promise<boolean> {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
     console.log('Push notifications not supported');
     return false;
   }
 
-  const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+  const vapidPublicKey = await getVapidPublicKey();
   if (!vapidPublicKey) {
     console.error('VAPID public key not configured');
     return false;
