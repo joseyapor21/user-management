@@ -8,17 +8,16 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-producti
 const SUBSCRIPTIONS_COLLECTION = 'v5push_subscriptions';
 const USERS_COLLECTION = 'v5users';
 
-// Configure web-push with VAPID keys (check multiple possible env var names)
-const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || process.env.VAPID_PUBLIC_KEY;
-const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
+// VAPID keys for push notifications (hardcoded for reliability)
+const VAPID_PUBLIC_KEY = 'BJhtjt4mkjp_f-dFU8PHLFRjDqFpeHncXVY2VwtiQH_5_GTdmtdj9K1or3pwkOWRTXWhLr7JVtlhfDVsuV-GqHI';
+const VAPID_PRIVATE_KEY = 'LD2qY1dgXDty4tPoB0s5LoCH_AlowBBIa26UBgocq1w';
 
-if (vapidPublicKey && vapidPrivateKey) {
-  webpush.setVapidDetails(
-    'mailto:admin@ccoan-ny.org',
-    vapidPublicKey,
-    vapidPrivateKey
-  );
-}
+// Configure web-push with VAPID keys
+webpush.setVapidDetails(
+  'mailto:admin@ccoan-ny.org',
+  VAPID_PUBLIC_KEY,
+  VAPID_PRIVATE_KEY
+);
 
 // Get user info from token
 async function getUserFromRequest(request: NextRequest) {
@@ -50,16 +49,6 @@ export async function POST(request: NextRequest) {
   const userInfo = await getUserFromRequest(request);
   if (!userInfo) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  // Check if VAPID keys are configured
-  if (!vapidPublicKey || !vapidPrivateKey) {
-    // Silently fail if VAPID keys are not configured
-    return NextResponse.json({
-      success: true,
-      message: 'Push notifications not configured',
-      sent: 0,
-    });
   }
 
   try {
