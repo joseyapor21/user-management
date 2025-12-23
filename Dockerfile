@@ -15,6 +15,11 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV SKIP_ENV_VALIDATION=1
+
+# Set dummy env vars for build (will be overridden at runtime)
+ENV MONGODB_URI=mongodb://localhost:27017/build
+ENV JWT_SECRET=build-secret
 
 RUN npm run build
 
