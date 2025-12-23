@@ -198,15 +198,19 @@ export default function ColumnManager({
                 )}
 
                 {/* Color selector */}
-                <select
-                  value={column.color || '#6b7280'}
-                  onChange={(e) => handleUpdateColumn(column.id, { color: e.target.value })}
-                  className="text-xs px-1 py-1 border rounded bg-white"
-                >
+                <div className="flex gap-1">
                   {colorOptions.map(opt => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    <button
+                      key={opt.value}
+                      onClick={() => handleUpdateColumn(column.id, { color: opt.value })}
+                      className={`w-5 h-5 rounded-full border-2 transition-transform hover:scale-110 ${
+                        column.color === opt.value ? 'border-gray-800 scale-110' : 'border-transparent'
+                      }`}
+                      style={{ backgroundColor: opt.value }}
+                      title={opt.label}
+                    />
                   ))}
-                </select>
+                </div>
 
                 {/* Delete button */}
                 <button
