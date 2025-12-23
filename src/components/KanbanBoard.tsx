@@ -143,7 +143,7 @@ export default function KanbanBoard({ token, departments, userId, isSuperUser, i
 
     // Optimistic update
     setProjects(prev => prev.map(p =>
-      p.id === draggedProject.id ? { ...p, status: newStatus } : p
+      p.id === draggedProject.id ? { ...p, status: newStatus as ProjectStatus } : p
     ));
 
     try {
