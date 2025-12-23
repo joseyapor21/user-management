@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Department, Priority, ProjectStatus, User } from '@/types';
+import { Department, Priority, ProjectStatus, User, RecurrenceType } from '@/types';
+import { useNotifications } from '@/hooks/useNotifications';
 
 interface CreateTaskModalProps {
   token: string;
@@ -28,6 +29,14 @@ const statusOptions: { value: ProjectStatus; label: string }[] = [
   { value: 'done', label: 'Done' },
 ];
 
+const recurrenceOptions: { value: RecurrenceType; label: string }[] = [
+  { value: 'none', label: 'No Repeat' },
+  { value: 'daily', label: 'Daily' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'biweekly', label: 'Bi-weekly' },
+  { value: 'monthly', label: 'Monthly' },
+];
+
 export default function CreateTaskModal({
   token,
   departments,
@@ -41,6 +50,7 @@ export default function CreateTaskModal({
   const [saving, setSaving] = useState(false);
   const [members, setMembers] = useState<User[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
+  const { showToast, showError } = useNotifications();
 
   const [form, setForm] = useState({
     departmentId: initialDepartmentId,
@@ -49,8 +59,13 @@ export default function CreateTaskModal({
     status: initialStatus,
     priority: 'medium' as Priority,
     assigneeId: '',
+    assigneeIds: [] as string[],
     dueDate: '',
+    estimatedHours: 0,
+    recurrence: 'none' as RecurrenceType,
+    recurrenceEndDate: '',
   });
+  const [showMultiAssign, setShowMultiAssign] = useState(false);
 
   // Filter departments where user is admin (or all if superuser)
   const availableDepartments = isSuperUser
@@ -103,17 +118,23 @@ export default function CreateTaskModal({
     e.preventDefault();
 
     if (!form.title.trim()) {
-      alert('Title is required');
+      showError('Title is required');
       return;
     }
 
     if (!form.departmentId) {
-      alert('Please select a department');
+      showError('Please select a department');
       return;
     }
 
     setSaving(true);
     try {
+      // Determine primary assignee and additional assignees
+      const primaryAssignee = showMultiAssign
+        ? (form.assigneeIds[0] || null)
+        : (form.assigneeId || null);
+      const allAssignees = showMultiAssign ? form.assigneeIds : (form.assigneeId ? [form.assigneeId] : []);
+
       const res = await fetch('/api/projects', {
         method: 'POST',
         headers: {
@@ -122,22 +143,66 @@ export default function CreateTaskModal({
         },
         body: JSON.stringify({
           ...form,
-          assigneeId: form.assigneeId || null,
+          assigneeId: primaryAssignee,
+          assigneeIds: allAssignees,
           dueDate: form.dueDate ? new Date(form.dueDate).toISOString() : null,
+          estimatedHours: form.estimatedHours || null,
+          recurrence: form.recurrence !== 'none' ? {
+            type: form.recurrence,
+            endDate: form.recurrenceEndDate ? new Date(form.recurrenceEndDate).toISOString() : null,
+          } : undefined,
         }),
       });
 
       if (res.ok) {
+        const data = await res.json();
+
+        showToast({
+          type: 'task_created',
+          taskTitle: form.title,
+          taskId: data.data?.id || '',
+          byUser: 'You',
+        });
+
+        // Send push notification to all assignees
+        const assigneesToNotify = allAssignees.filter(id => id !== userId);
+        assigneesToNotify.forEach(assigneeId => {
+          fetch('/api/push/send', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              userId: assigneeId,
+              notification: {
+                title: 'New Task Assigned',
+                body: `You've been assigned to "${form.title}"`,
+                url: `/dashboard`,
+              },
+            }),
+          }).catch(() => {});
+        });
+
         onCreate();
       } else {
         const data = await res.json();
-        alert(data.error || 'Failed to create task');
+        showError(data.error || 'Failed to create task');
       }
     } catch {
-      alert('Failed to create task');
+      showError('Failed to create task');
     } finally {
       setSaving(false);
     }
+  };
+
+  const toggleAssignee = (memberId: string) => {
+    setForm(prev => ({
+      ...prev,
+      assigneeIds: prev.assigneeIds.includes(memberId)
+        ? prev.assigneeIds.filter(id => id !== memberId)
+        : [...prev.assigneeIds, memberId]
+    }));
   };
 
   return (
@@ -229,9 +294,85 @@ export default function CreateTaskModal({
               </select>
             </div>
 
-            {/* Assignee */}
+            {/* Due Date */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Assignee</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
+              <input
+                type="date"
+                value={form.dueDate}
+                onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900"
+              />
+            </div>
+
+            {/* Estimated Hours */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Est. Hours</label>
+              <input
+                type="number"
+                min="0"
+                step="0.5"
+                value={form.estimatedHours || ''}
+                onChange={(e) => setForm({ ...form, estimatedHours: parseFloat(e.target.value) || 0 })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900"
+                placeholder="0"
+              />
+            </div>
+          </div>
+
+          {/* Recurrence Section */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Repeat
+              </label>
+              <select
+                value={form.recurrence}
+                onChange={(e) => setForm({ ...form, recurrence: e.target.value as RecurrenceType })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900"
+              >
+                {recurrenceOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+
+            {form.recurrence !== 'none' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Repeat Until
+                </label>
+                <input
+                  type="date"
+                  value={form.recurrenceEndDate}
+                  onChange={(e) => setForm({ ...form, recurrenceEndDate: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900"
+                  placeholder="Optional"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Assignee Section */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Assignee{showMultiAssign ? 's' : ''}
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMultiAssign(!showMultiAssign);
+                  // Clear selections when toggling
+                  setForm({ ...form, assigneeId: '', assigneeIds: [] });
+                }}
+                className="text-xs text-blue-600 hover:text-blue-700"
+              >
+                {showMultiAssign ? 'Single Assignee' : 'Multiple Assignees'}
+              </button>
+            </div>
+
+            {!showMultiAssign ? (
               <select
                 value={form.assigneeId}
                 onChange={(e) => setForm({ ...form, assigneeId: e.target.value })}
@@ -245,18 +386,35 @@ export default function CreateTaskModal({
                   </option>
                 ))}
               </select>
-            </div>
-
-            {/* Due Date */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
-              <input
-                type="date"
-                value={form.dueDate}
-                onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900"
-              />
-            </div>
+            ) : (
+              <div className="border border-gray-300 rounded-md max-h-32 overflow-y-auto">
+                {loadingMembers ? (
+                  <p className="p-2 text-sm text-gray-500">Loading members...</p>
+                ) : members.length === 0 ? (
+                  <p className="p-2 text-sm text-gray-500">No members in this department</p>
+                ) : (
+                  members.map((member) => (
+                    <label
+                      key={member.id}
+                      className="flex items-center gap-2 p-2 hover:bg-gray-50 cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={form.assigneeIds.includes(member.id)}
+                        onChange={() => toggleAssignee(member.id)}
+                        className="w-4 h-4 rounded border-gray-300"
+                      />
+                      <span className="text-sm text-gray-700">{member.name || member.email}</span>
+                    </label>
+                  ))
+                )}
+              </div>
+            )}
+            {showMultiAssign && form.assigneeIds.length > 0 && (
+              <p className="mt-1 text-xs text-gray-500">
+                {form.assigneeIds.length} assignee{form.assigneeIds.length > 1 ? 's' : ''} selected
+              </p>
+            )}
           </div>
 
           {/* Actions */}

@@ -109,7 +109,11 @@ export async function GET(request: NextRequest) {
       .toArray();
 
     // Get user and department names for enrichment
-    const userIds = Array.from(new Set(projects.flatMap(p => [p.assigneeId, p.createdBy].filter(Boolean))));
+    const userIds = Array.from(new Set(projects.flatMap(p => [
+      p.assigneeId,
+      p.createdBy,
+      ...(p.assigneeIds || [])
+    ].filter(Boolean))));
     const deptIds = Array.from(new Set(projects.map(p => p.departmentId)));
 
     const users = await db.collection(USERS_COLLECTION)
@@ -129,6 +133,7 @@ export async function GET(request: NextRequest) {
       ...p,
       id: p._id.toString(),
       assigneeName: p.assigneeId ? userMap.get(p.assigneeId) || 'Unknown' : null,
+      assigneeNames: (p.assigneeIds || []).map((id: string) => userMap.get(id) || 'Unknown'),
       creatorName: userMap.get(p.createdBy) || 'Unknown',
       departmentName: deptMap.get(p.departmentId) || 'Unknown',
     }));
@@ -149,7 +154,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { departmentId, title, description, status, priority, assigneeId, dueDate } = body;
+    const { departmentId, title, description, status, priority, assigneeId, assigneeIds, dueDate, labels, subtasks, estimatedHours } = body;
 
     if (!departmentId || !title) {
       return NextResponse.json({ error: 'Department and title are required' }, { status: 400 });
@@ -177,10 +182,24 @@ export async function POST(request: NextRequest) {
       status: status || 'backlog',
       priority: priority || 'medium',
       assigneeId: assigneeId || null,
+      assigneeIds: assigneeIds || [],
       createdBy: userInfo.userId,
       dueDate: dueDate || null,
+      labels: labels || [],
+      subtasks: subtasks || [],
       attachments: [],
       comments: [],
+      activityLog: [{
+        id: new ObjectId().toString(),
+        userId: userInfo.userId,
+        userName: userInfo.userName,
+        action: 'created',
+        details: 'Task created',
+        timestamp: new Date().toISOString(),
+      }],
+      estimatedHours: estimatedHours || null,
+      loggedHours: 0,
+      blockedBy: [],
       order: (lastProject?.order || 0) + 1,
       metadata: {
         createdAt: new Date().toISOString(),
@@ -210,7 +229,7 @@ export async function PUT(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { id, title, description, status, priority, assigneeId, dueDate } = body;
+    const { id, title, description, status, priority, assigneeId, assigneeIds, dueDate, labels, subtasks, estimatedHours, loggedHours, blockedBy } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'Project ID is required' }, { status: 400 });
@@ -226,33 +245,69 @@ export async function PUT(request: NextRequest) {
 
     // Check permissions: admins can edit anything, assignees can only change status
     const canManage = await canManageDepartment(userInfo.userId, userInfo.isSuperUser, existingProject.departmentId);
-    const isAssignee = existingProject.assigneeId === userInfo.userId;
+    const isAssignee = existingProject.assigneeId === userInfo.userId || existingProject.assigneeIds?.includes(userInfo.userId);
 
     if (!canManage && !isAssignee) {
       return NextResponse.json({ error: 'You do not have permission to edit this project' }, { status: 403 });
     }
 
+    // Build activity log entries for changes
+    const activityEntries: Array<{id: string; userId: string; userName: string; action: string; details?: string; timestamp: string}> = [];
+    const now = new Date().toISOString();
+
     // If user is just an assignee (not admin), they can only change status
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updateData: any = {
-      'metadata.updatedAt': new Date().toISOString(),
+      'metadata.updatedAt': now,
     };
 
     if (canManage) {
       // Admins can update everything
-      if (title !== undefined) updateData.title = title.trim();
+      if (title !== undefined && title !== existingProject.title) {
+        updateData.title = title.trim();
+        activityEntries.push({ id: new ObjectId().toString(), userId: userInfo.userId, userName: userInfo.userName, action: 'updated', details: `Changed title to "${title.trim()}"`, timestamp: now });
+      }
       if (description !== undefined) updateData.description = description.trim();
-      if (priority !== undefined) updateData.priority = priority;
-      if (assigneeId !== undefined) updateData.assigneeId = assigneeId;
+      if (priority !== undefined && priority !== existingProject.priority) {
+        updateData.priority = priority;
+        activityEntries.push({ id: new ObjectId().toString(), userId: userInfo.userId, userName: userInfo.userName, action: 'updated', details: `Changed priority to ${priority}`, timestamp: now });
+      }
+      if (assigneeId !== undefined && assigneeId !== existingProject.assigneeId) {
+        updateData.assigneeId = assigneeId;
+        activityEntries.push({ id: new ObjectId().toString(), userId: userInfo.userId, userName: userInfo.userName, action: 'assigned', details: assigneeId ? 'Assigned task' : 'Unassigned task', timestamp: now });
+      }
+      if (assigneeIds !== undefined) updateData.assigneeIds = assigneeIds;
       if (dueDate !== undefined) updateData.dueDate = dueDate;
+      if (labels !== undefined) updateData.labels = labels;
+      if (subtasks !== undefined) updateData.subtasks = subtasks;
+      if (estimatedHours !== undefined) updateData.estimatedHours = estimatedHours;
+      if (blockedBy !== undefined) updateData.blockedBy = blockedBy;
+    }
+
+    // Assignees can update subtasks and log hours
+    if (isAssignee) {
+      if (subtasks !== undefined) updateData.subtasks = subtasks;
+      if (loggedHours !== undefined) updateData.loggedHours = loggedHours;
     }
 
     // Both admins and assignees can change status
-    if (status !== undefined) updateData.status = status;
+    if (status !== undefined && status !== existingProject.status) {
+      updateData.status = status;
+      activityEntries.push({ id: new ObjectId().toString(), userId: userInfo.userId, userName: userInfo.userName, action: 'moved', details: `Moved from ${existingProject.status} to ${status}`, timestamp: now });
+    }
+
+    // Build the update operation
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const updateOperation: any = { $set: updateData };
+
+    // Add activity log entries if there are any
+    if (activityEntries.length > 0) {
+      updateOperation.$push = { activityLog: { $each: activityEntries } };
+    }
 
     await db.collection(COLLECTION_NAME).updateOne(
       { _id: new ObjectId(id) },
-      { $set: updateData }
+      updateOperation
     );
 
     return NextResponse.json({

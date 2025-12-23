@@ -32,7 +32,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
       <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
         <h1 className="text-2xl font-bold text-center mb-6 text-gray-800">
-          User Management
+          CCOAN New York
         </h1>
         <h2 className="text-lg text-center mb-6 text-gray-600">
           Sign in to continue

@@ -7,8 +7,21 @@ import { User, Department } from '@/types';
 import DepartmentCard from '@/components/DepartmentCard';
 import UserSearchModal from '@/components/UserSearchModal';
 import KanbanBoard from '@/components/KanbanBoard';
+import PushNotificationPrompt from '@/components/PushNotificationPrompt';
 
-type Tab = 'departments' | 'users' | 'projects';
+type Tab = 'departments' | 'users' | 'projects' | 'invites';
+
+interface Invite {
+  id: string;
+  token: string;
+  email: string | null;
+  createdBy: string;
+  createdAt: string;
+  expiresAt: string;
+  used: boolean;
+  usedAt: string | null;
+  usedByEmail: string | null;
+}
 
 export default function DashboardPage() {
   const { user, token, isLoading, logout } = useAuth();
@@ -38,6 +51,13 @@ export default function DashboardPage() {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [profileForm, setProfileForm] = useState({ name: '', password: '' });
 
+  // Invite state
+  const [invites, setInvites] = useState<Invite[]>([]);
+  const [showInviteForm, setShowInviteForm] = useState(false);
+  const [newInviteEmail, setNewInviteEmail] = useState('');
+  const [creatingInvite, setCreatingInvite] = useState(false);
+  const [copiedInviteId, setCopiedInviteId] = useState<string | null>(null);
+
   const fetchData = useCallback(async () => {
     setLoadingData(true);
     try {
@@ -58,12 +78,21 @@ export default function DashboardPage() {
           setUsers(userData.data);
         }
       }
+
+      // Fetch invites if admin or superuser
+      if (user?.isSuperUser || user?.isAdmin) {
+        const inviteRes = await fetch('/api/invites', { headers });
+        const inviteData = await inviteRes.json();
+        if (inviteData.success) {
+          setInvites(inviteData.data);
+        }
+      }
     } catch (err) {
       console.error('Error fetching data:', err);
       setError('Failed to load data');
     }
     setLoadingData(false);
-  }, [token, user?.isSuperUser]);
+  }, [token, user?.isSuperUser, user?.isAdmin]);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -320,6 +349,68 @@ export default function DashboardPage() {
     }
   };
 
+  const createInvite = async () => {
+    setCreatingInvite(true);
+    try {
+      const res = await fetch('/api/invites', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          email: newInviteEmail || undefined,
+          expiresInDays: 7,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setNewInviteEmail('');
+        setShowInviteForm(false);
+        fetchData();
+        // Copy the signup URL to clipboard
+        navigator.clipboard.writeText(data.data.signupUrl);
+        alert(`Invite created! Signup URL copied to clipboard:\n\n${data.data.signupUrl}`);
+      } else {
+        alert(data.error || 'Failed to create invite');
+      }
+    } catch (err) {
+      console.error('Error creating invite:', err);
+      alert('Failed to create invite');
+    } finally {
+      setCreatingInvite(false);
+    }
+  };
+
+  const deleteInvite = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this invite?')) return;
+
+    try {
+      const res = await fetch(`/api/invites?id=${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        fetchData();
+      } else {
+        alert(data.error || 'Failed to delete invite');
+      }
+    } catch (err) {
+      console.error('Error deleting invite:', err);
+      alert('Failed to delete invite');
+    }
+  };
+
+  const copyInviteLink = (inviteToken: string) => {
+    const url = `${window.location.origin}/signup?token=${inviteToken}`;
+    navigator.clipboard.writeText(url);
+    setCopiedInviteId(inviteToken);
+    setTimeout(() => setCopiedInviteId(null), 2000);
+  };
+
   if (isLoading || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
@@ -333,7 +424,7 @@ export default function DashboardPage() {
       {/* Header */}
       <header className="bg-white shadow">
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-xl font-bold text-gray-800">User Management</h1>
+          <h1 className="text-xl font-bold text-gray-800">Dashboard - CCOAN New York</h1>
           <div className="flex items-center gap-4">
             <span className="text-sm text-gray-600">
               {user.name || user.email} {user.isSuperUser && <span className="text-blue-600">(SuperUser)</span>}
@@ -375,6 +466,14 @@ export default function DashboardPage() {
               className={`pb-2 px-4 ${activeTab === 'users' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-600'}`}
             >
               All Users
+            </button>
+          )}
+          {(user.isSuperUser || user.isAdmin) && (
+            <button
+              onClick={() => setActiveTab('invites')}
+              className={`pb-2 px-4 ${activeTab === 'invites' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-600'}`}
+            >
+              Invites
             </button>
           )}
         </div>
@@ -453,6 +552,7 @@ export default function DashboardPage() {
                         department={dept}
                         token={token!}
                         isSuperUser={user.isSuperUser}
+                        currentUserId={user.id}
                         onAddAdmin={() => openUserModal(dept, 'admin')}
                         onAddMember={() => openUserModal(dept, 'member')}
                         onRemoveAdmin={(userId) => handleRemoveAdmin(dept.id, userId)}
@@ -581,6 +681,129 @@ export default function DashboardPage() {
                                   Delete
                                 </button>
                               )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Invites Tab */}
+            {activeTab === 'invites' && (user.isSuperUser || user.isAdmin) && (
+              <div>
+                <div className="mb-4">
+                  {showInviteForm ? (
+                    <div className="bg-white p-4 rounded-lg shadow space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Email (optional)
+                        </label>
+                        <input
+                          type="email"
+                          value={newInviteEmail}
+                          onChange={(e) => setNewInviteEmail(e.target.value)}
+                          placeholder="Restrict invite to specific email (optional)"
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Leave blank to allow any email to use this invite
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={createInvite}
+                          disabled={creatingInvite}
+                          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                        >
+                          {creatingInvite ? 'Creating...' : 'Create Invite'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowInviteForm(false);
+                            setNewInviteEmail('');
+                          }}
+                          className="bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setShowInviteForm(true)}
+                      className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+                    >
+                      + Create Invite Link
+                    </button>
+                  )}
+                </div>
+
+                {invites.length === 0 ? (
+                  <p className="text-gray-500 text-center py-8">No invites found</p>
+                ) : (
+                  <div className="bg-white rounded-lg shadow overflow-hidden">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invite</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Expires</th>
+                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {invites.map((invite) => (
+                          <tr key={invite.id} className={invite.used ? 'bg-gray-50' : ''}>
+                            <td className="px-6 py-4 text-sm">
+                              <div className="text-gray-900 font-mono text-xs">
+                                {invite.token.substring(0, 16)}...
+                              </div>
+                              {invite.email && (
+                                <div className="text-gray-500 text-xs mt-1">
+                                  For: {invite.email}
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm">
+                              {invite.used ? (
+                                <div>
+                                  <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs">Used</span>
+                                  {invite.usedByEmail && (
+                                    <div className="text-xs text-gray-500 mt-1">{invite.usedByEmail}</div>
+                                  )}
+                                </div>
+                              ) : new Date(invite.expiresAt) < new Date() ? (
+                                <span className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs">Expired</span>
+                              ) : (
+                                <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">Active</span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              <div>{new Date(invite.createdAt).toLocaleDateString()}</div>
+                              <div className="text-xs">by {invite.createdBy}</div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {new Date(invite.expiresAt).toLocaleDateString()}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm space-x-3">
+                              {!invite.used && new Date(invite.expiresAt) > new Date() && (
+                                <button
+                                  onClick={() => copyInviteLink(invite.token)}
+                                  className="text-blue-600 hover:text-blue-800"
+                                >
+                                  {copiedInviteId === invite.token ? 'Copied!' : 'Copy Link'}
+                                </button>
+                              )}
+                              <button
+                                onClick={() => deleteInvite(invite.id)}
+                                className="text-red-600 hover:text-red-800"
+                              >
+                                Delete
+                              </button>
                             </td>
                           </tr>
                         ))}
@@ -729,6 +952,9 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      {/* Push Notification Prompt */}
+      {token && <PushNotificationPrompt token={token} />}
     </div>
   );
 }

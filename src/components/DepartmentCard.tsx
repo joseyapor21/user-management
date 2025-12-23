@@ -7,6 +7,7 @@ interface DepartmentCardProps {
   department: Department;
   token: string;
   isSuperUser: boolean;
+  currentUserId: string;
   onAddAdmin: () => void;
   onAddMember: () => void;
   onRemoveAdmin: (userId: string) => void;
@@ -18,12 +19,15 @@ export default function DepartmentCard({
   department,
   token,
   isSuperUser,
+  currentUserId,
   onAddAdmin,
   onAddMember,
   onRemoveAdmin,
   onRemoveMember,
   onDelete,
 }: DepartmentCardProps) {
+  // Check if current user can manage this department (SuperUser or department admin)
+  const canManage = isSuperUser || department.adminIds?.includes(currentUserId);
   const [showAdmins, setShowAdmins] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
   const [admins, setAdmins] = useState<User[]>([]);
@@ -89,10 +93,22 @@ export default function DepartmentCard({
     setMembers(members.filter((m) => m.id !== userId));
   };
 
+  // Determine user's role in this department
+  const isUserAdmin = department.adminIds?.includes(currentUserId) || false;
+  const isUserMember = department.memberIds?.includes(currentUserId) || false;
+
   return (
     <div className="bg-white rounded-lg shadow p-4">
       <div className="flex justify-between items-start mb-4">
-        <h3 className="text-lg font-semibold text-gray-800">{department.name}</h3>
+        <div>
+          <h3 className="text-lg font-semibold text-gray-800">{department.name}</h3>
+          {/* Show user's role in this department */}
+          {!isSuperUser && (
+            <span className={`text-xs px-2 py-0.5 rounded ${isUserAdmin ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
+              {isUserAdmin ? 'Admin' : isUserMember ? 'Member' : 'Viewer'}
+            </span>
+          )}
+        </div>
         {isSuperUser && (
           <button
             onClick={onDelete}
@@ -127,22 +143,26 @@ export default function DepartmentCard({
                       <span className="font-medium">{admin.name || admin.email}</span>
                       {admin.name && <span className="text-gray-500 text-xs ml-1">({admin.email})</span>}
                     </div>
-                    <button
-                      onClick={() => handleRemoveAdmin(admin.id)}
-                      className="text-red-500 hover:text-red-700 text-xs"
-                    >
-                      Remove
-                    </button>
+                    {canManage && (
+                      <button
+                        onClick={() => handleRemoveAdmin(admin.id)}
+                        className="text-red-500 hover:text-red-700 text-xs"
+                      >
+                        Remove
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>
             )}
-            <button
-              onClick={onAddAdmin}
-              className="mt-2 text-sm text-blue-600 hover:text-blue-800"
-            >
-              + Add Admin
-            </button>
+            {canManage && (
+              <button
+                onClick={onAddAdmin}
+                className="mt-2 text-sm text-blue-600 hover:text-blue-800"
+              >
+                + Add Admin
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -171,22 +191,26 @@ export default function DepartmentCard({
                       <span className="font-medium">{member.name || member.email}</span>
                       {member.name && <span className="text-gray-500 text-xs ml-1">({member.email})</span>}
                     </div>
-                    <button
-                      onClick={() => handleRemoveMember(member.id)}
-                      className="text-red-500 hover:text-red-700 text-xs"
-                    >
-                      Remove
-                    </button>
+                    {canManage && (
+                      <button
+                        onClick={() => handleRemoveMember(member.id)}
+                        className="text-red-500 hover:text-red-700 text-xs"
+                      >
+                        Remove
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>
             )}
-            <button
-              onClick={onAddMember}
-              className="mt-2 text-sm text-green-600 hover:text-green-800"
-            >
-              + Add Member
-            </button>
+            {canManage && (
+              <button
+                onClick={onAddMember}
+                className="mt-2 text-sm text-green-600 hover:text-green-800"
+              >
+                + Add Member
+              </button>
+            )}
           </div>
         )}
       </div>

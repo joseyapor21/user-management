@@ -68,8 +68,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Department not found' }, { status: 404 });
     }
 
-    // Check access
-    if (!userInfo.isSuperUser && !department.adminIds?.includes(userInfo.userId)) {
+    // Check access - allow SuperUsers, department admins, and department members to view
+    const isAdmin = department.adminIds?.includes(userInfo.userId);
+    const isMember = department.memberIds?.includes(userInfo.userId);
+    if (!userInfo.isSuperUser && !isAdmin && !isMember) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 

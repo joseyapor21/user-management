@@ -6,13 +6,18 @@ import { ObjectId } from 'mongodb';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 const COLLECTION_NAME = 'v5users';
+const DEPARTMENTS_COLLECTION = 'v5departments';
 
-// Verify SuperUser from token
-async function verifySuperUser(request: NextRequest): Promise<{ isSuperUser: boolean; userId?: string }> {
+// Verify user from token and get permissions
+async function verifyUser(request: NextRequest): Promise<{
+  isSuperUser: boolean;
+  userId?: string;
+  isDepartmentAdmin: boolean;
+}> {
   try {
     const authHeader = request.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return { isSuperUser: false };
+      return { isSuperUser: false, isDepartmentAdmin: false };
     }
 
     const token = authHeader.split(' ')[1];
@@ -21,14 +26,20 @@ async function verifySuperUser(request: NextRequest): Promise<{ isSuperUser: boo
     const db = await getDatabase();
     const user = await db.collection(COLLECTION_NAME).findOne({ _id: new ObjectId(decoded._id) });
 
-    if (!user) return { isSuperUser: false };
+    if (!user) return { isSuperUser: false, isDepartmentAdmin: false };
+
+    // Check if user is admin of any department
+    const departmentWithAdmin = await db.collection(DEPARTMENTS_COLLECTION).findOne({
+      adminIds: user._id.toString()
+    });
 
     return {
       isSuperUser: user.isSuperUser || false,
       userId: user._id.toString(),
+      isDepartmentAdmin: !!departmentWithAdmin,
     };
   } catch {
-    return { isSuperUser: false };
+    return { isSuperUser: false, isDepartmentAdmin: false };
   }
 }
 
@@ -38,11 +49,11 @@ function hashPassword(password: string): string {
   return `sha256$${salt}$${hash}`;
 }
 
-// GET - List all users (SuperUser only)
+// GET - List all users (SuperUser or Department Admin)
 export async function GET(request: NextRequest) {
-  const { isSuperUser } = await verifySuperUser(request);
-  if (!isSuperUser) {
-    return NextResponse.json({ error: 'Unauthorized - SuperUser access required' }, { status: 403 });
+  const { isSuperUser, isDepartmentAdmin } = await verifyUser(request);
+  if (!isSuperUser && !isDepartmentAdmin) {
+    return NextResponse.json({ error: 'Unauthorized - SuperUser or Department Admin access required' }, { status: 403 });
   }
 
   try {
@@ -68,7 +79,7 @@ export async function GET(request: NextRequest) {
 
 // POST - Create new user (SuperUser only)
 export async function POST(request: NextRequest) {
-  const { isSuperUser } = await verifySuperUser(request);
+  const { isSuperUser } = await verifyUser(request);
   if (!isSuperUser) {
     return NextResponse.json({ error: 'Unauthorized - SuperUser access required' }, { status: 403 });
   }
@@ -116,7 +127,7 @@ export async function POST(request: NextRequest) {
 
 // PUT - Update user (SuperUser only)
 export async function PUT(request: NextRequest) {
-  const { isSuperUser } = await verifySuperUser(request);
+  const { isSuperUser } = await verifyUser(request);
   if (!isSuperUser) {
     return NextResponse.json({ error: 'Unauthorized - SuperUser access required' }, { status: 403 });
   }
@@ -156,7 +167,7 @@ export async function PUT(request: NextRequest) {
 
 // DELETE - Delete user (SuperUser only, can delete anyone including other SuperUsers)
 export async function DELETE(request: NextRequest) {
-  const { isSuperUser, userId } = await verifySuperUser(request);
+  const { isSuperUser, userId } = await verifyUser(request);
   if (!isSuperUser) {
     return NextResponse.json({ error: 'Unauthorized - SuperUser access required' }, { status: 403 });
   }

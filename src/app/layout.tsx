@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
+import { Toaster } from "react-hot-toast";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -15,8 +16,8 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "User Management",
-  description: "Manage users and departments",
+  title: "Dashboard - CCOAN New York",
+  description: "CCOAN New York Project Management Dashboard",
 };
 
 export default function RootLayout({
@@ -31,6 +32,16 @@ export default function RootLayout({
       >
         <AuthProvider>
           {children}
+          <Toaster
+            position="top-right"
+            toastOptions={{
+              duration: 4000,
+              style: {
+                background: '#fff',
+                color: '#1f2937',
+              },
+            }}
+          />
         </AuthProvider>
       </body>
     </html>
