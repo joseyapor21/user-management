@@ -21,6 +21,11 @@ interface UserOption {
   email: string;
 }
 
+interface SelectedUser {
+  id: string;
+  name: string;
+}
+
 // Get next Sunday from a date
 function getNextSunday(date: Date): Date {
   const d = new Date(date);
@@ -63,6 +68,10 @@ export default function SundaySchedule({ token, isSuperUser, departments }: Sund
   const [selectedAdminId, setSelectedAdminId] = useState<string>('');
   const [savingAdmin, setSavingAdmin] = useState(false);
 
+  // Cell editing with user selector
+  const [selectedUsers, setSelectedUsers] = useState<SelectedUser[]>([]);
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
+
   // Build a map for quick slot lookup
   const getSlotValue = useCallback((phase: string, dept: string): string => {
     if (!schedule?.slots) return '';
@@ -104,9 +113,8 @@ export default function SundaySchedule({ token, isSuperUser, departments }: Sund
     fetchSchedule();
   }, [fetchSchedule]);
 
-  // Fetch department members for admin selection (SuperUser only)
+  // Fetch department members for user selection
   const fetchUsers = useCallback(async () => {
-    if (!isSuperUser) return;
     try {
       // Get all unique member IDs from all departments
       const allMemberIds = new Set<string>();
@@ -139,7 +147,12 @@ export default function SundaySchedule({ token, isSuperUser, departments }: Sund
     } catch (error) {
       console.error('Error fetching users:', error);
     }
-  }, [token, isSuperUser, departments]);
+  }, [token, departments]);
+
+  // Fetch users on mount
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
 
   // Open admin modal
   const openAdminModal = () => {
@@ -184,8 +197,48 @@ export default function SundaySchedule({ token, isSuperUser, departments }: Sund
   const startEditing = (phase: string, dept: string) => {
     if (!canEdit) return;
     setEditingCell({ phase, dept });
-    setCellValue(getSlotValue(phase, dept));
+    const currentValue = getSlotValue(phase, dept);
+    setCellValue(currentValue);
+
+    // Parse existing assignees to pre-select users
+    if (currentValue) {
+      const names = currentValue.split(/[,\n]/).map(n => n.trim()).filter(Boolean);
+      const matched: SelectedUser[] = [];
+      names.forEach(name => {
+        const user = users.find(u => u.name.toLowerCase() === name.toLowerCase());
+        if (user) {
+          matched.push({ id: user.id, name: user.name });
+        }
+      });
+      setSelectedUsers(matched);
+    } else {
+      setSelectedUsers([]);
+    }
+    setShowUserDropdown(false);
   };
+
+  // Toggle user selection
+  const toggleUserSelection = (user: UserOption) => {
+    setSelectedUsers(prev => {
+      const exists = prev.find(u => u.id === user.id);
+      if (exists) {
+        return prev.filter(u => u.id !== user.id);
+      }
+      return [...prev, { id: user.id, name: user.name }];
+    });
+  };
+
+  // Update cell value when selected users change
+  const updateCellFromUsers = useCallback(() => {
+    const names = selectedUsers.map(u => u.name).join(', ');
+    setCellValue(names);
+  }, [selectedUsers]);
+
+  useEffect(() => {
+    if (editingCell) {
+      updateCellFromUsers();
+    }
+  }, [selectedUsers, editingCell, updateCellFromUsers]);
 
   // Save cell edit
   const saveCell = async () => {
@@ -236,16 +289,8 @@ export default function SundaySchedule({ token, isSuperUser, departments }: Sund
   const cancelEditing = () => {
     setEditingCell(null);
     setCellValue('');
-  };
-
-  // Handle key press in edit mode
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      saveCell();
-    } else if (e.key === 'Escape') {
-      cancelEditing();
-    }
+    setSelectedUsers([]);
+    setShowUserDropdown(false);
   };
 
   if (loading) {
@@ -404,18 +449,91 @@ export default function SundaySchedule({ token, isSuperUser, departments }: Sund
                         key={`${phase}-${dept}`}
                         className={`px-2 py-1 text-xs border-r border-b ${
                           canEdit ? 'cursor-pointer hover:bg-blue-50' : ''
-                        } ${isEditing ? 'bg-blue-100' : ''}`}
+                        } ${isEditing ? 'bg-blue-100 relative' : ''}`}
                         onClick={() => !isEditing && startEditing(phase, dept)}
                       >
                         {isEditing ? (
-                          <textarea
-                            value={cellValue}
-                            onChange={(e) => setCellValue(e.target.value)}
-                            onBlur={saveCell}
-                            onKeyDown={handleKeyDown}
-                            className="w-full min-h-[60px] p-1 text-xs border border-blue-400 rounded resize-none focus:outline-none focus:ring-1 focus:ring-blue-500"
-                            autoFocus
-                          />
+                          <div className="relative" onClick={(e) => e.stopPropagation()}>
+                            {/* Selected users display */}
+                            <div className="min-h-[40px] p-1 bg-white border border-blue-400 rounded text-gray-900">
+                              <div className="flex flex-wrap gap-1 mb-1">
+                                {selectedUsers.map((u) => (
+                                  <span
+                                    key={u.id}
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-xs"
+                                  >
+                                    {u.name}
+                                    <button
+                                      type="button"
+                                      onClick={() => toggleUserSelection({ id: u.id, name: u.name, email: '' })}
+                                      className="text-blue-600 hover:text-blue-800"
+                                    >
+                                      &times;
+                                    </button>
+                                  </span>
+                                ))}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setShowUserDropdown(!showUserDropdown)}
+                                className="text-xs text-blue-600 hover:text-blue-800"
+                              >
+                                + Add user
+                              </button>
+                            </div>
+
+                            {/* User dropdown */}
+                            {showUserDropdown && (
+                              <div className="absolute left-0 top-full mt-1 w-48 max-h-40 overflow-y-auto bg-white border border-gray-300 rounded-md shadow-lg z-20">
+                                {users.length === 0 ? (
+                                  <div className="p-2 text-xs text-gray-500">No users available</div>
+                                ) : (
+                                  users.map((user) => {
+                                    const isSelected = selectedUsers.some(u => u.id === user.id);
+                                    return (
+                                      <button
+                                        key={user.id}
+                                        type="button"
+                                        onClick={() => toggleUserSelection(user)}
+                                        className={`w-full text-left px-3 py-2 text-xs hover:bg-gray-100 flex items-center gap-2 ${
+                                          isSelected ? 'bg-blue-50 text-blue-800' : 'text-gray-700'
+                                        }`}
+                                      >
+                                        <span className={`w-4 h-4 border rounded flex items-center justify-center ${
+                                          isSelected ? 'bg-blue-600 border-blue-600' : 'border-gray-300'
+                                        }`}>
+                                          {isSelected && (
+                                            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                            </svg>
+                                          )}
+                                        </span>
+                                        {user.name}
+                                      </button>
+                                    );
+                                  })
+                                )}
+                              </div>
+                            )}
+
+                            {/* Action buttons */}
+                            <div className="flex gap-1 mt-1">
+                              <button
+                                type="button"
+                                onClick={saveCell}
+                                className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+                              >
+                                Save
+                              </button>
+                              <button
+                                type="button"
+                                onClick={cancelEditing}
+                                className="px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
                         ) : (
                           <div className="min-h-[40px] whitespace-pre-wrap text-gray-700">
                             {value || <span className="text-gray-300">-</span>}
@@ -436,9 +554,9 @@ export default function SundaySchedule({ token, isSuperUser, departments }: Sund
         <h3 className="text-sm font-semibold text-gray-700 mb-2">Instructions</h3>
         <ul className="text-xs text-gray-600 space-y-1">
           <li>• Click on any cell to edit the assigned person(s)</li>
-          <li>• Press Enter to save, Escape to cancel</li>
+          <li>• Click &quot;+ Add user&quot; to select members from the dropdown</li>
+          <li>• Click Save to confirm or Cancel to discard changes</li>
           <li>• Use arrows to navigate between Sundays</li>
-          <li>• Multiple names can be entered, separated by commas or on new lines</li>
         </ul>
       </div>
     </div>
