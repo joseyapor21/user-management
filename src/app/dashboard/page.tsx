@@ -558,6 +558,7 @@ export default function DashboardPage() {
           <SundaySchedule
             token={token!}
             isSuperUser={user.isSuperUser}
+            departments={departments}
           />
         )}
 

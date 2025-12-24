@@ -37,10 +37,8 @@ async function getUserFromRequest(request: NextRequest) {
   }
 }
 
-// Check if user can edit schedule
-async function canEditSchedule(db: ReturnType<typeof getDatabase> extends Promise<infer T> ? T : never, userId: string, isSuperUser: boolean) {
-  if (isSuperUser) return true;
-
+// Check if user can edit schedule (only the designated schedule admin)
+async function canEditSchedule(db: ReturnType<typeof getDatabase> extends Promise<infer T> ? T : never, userId: string) {
   const config = await db.collection(CONFIG_COLLECTION).findOne({ key: 'scheduleAdmin' });
   return config?.value === userId;
 }
@@ -73,7 +71,7 @@ export async function GET(request: NextRequest) {
       scheduleAdminName = adminUser?.name || adminUser?.email || null;
     }
 
-    const canEdit = await canEditSchedule(db, userInfo.userId, userInfo.isSuperUser);
+    const canEdit = await canEditSchedule(db, userInfo.userId);
 
     if (schedule) {
       return NextResponse.json({
@@ -121,7 +119,7 @@ export async function PUT(request: NextRequest) {
     const db = await getDatabase();
 
     // Check if user can edit
-    const canEdit = await canEditSchedule(db, userInfo.userId, userInfo.isSuperUser);
+    const canEdit = await canEditSchedule(db, userInfo.userId);
     if (!canEdit) {
       return NextResponse.json({ error: 'You do not have permission to edit the schedule' }, { status: 403 });
     }

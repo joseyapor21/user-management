@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { ScheduleSlot, SERVICE_PHASES, SCHEDULE_DEPARTMENTS, User } from '@/types';
+import { ScheduleSlot, SERVICE_PHASES, SCHEDULE_DEPARTMENTS, User, Department } from '@/types';
 
 interface SundayScheduleProps {
   token: string;
   isSuperUser: boolean;
+  departments: Department[];
 }
 
 interface ScheduleData {
@@ -45,7 +46,7 @@ function formatDateForApi(date: Date): string {
   return date.toISOString().split('T')[0];
 }
 
-export default function SundaySchedule({ token, isSuperUser }: SundayScheduleProps) {
+export default function SundaySchedule({ token, isSuperUser, departments }: SundayScheduleProps) {
   const [selectedDate, setSelectedDate] = useState<Date>(getNextSunday(new Date()));
   const [schedule, setSchedule] = useState<ScheduleData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -103,25 +104,42 @@ export default function SundaySchedule({ token, isSuperUser }: SundaySchedulePro
     fetchSchedule();
   }, [fetchSchedule]);
 
-  // Fetch users for admin selection (SuperUser only)
+  // Fetch department members for admin selection (SuperUser only)
   const fetchUsers = useCallback(async () => {
     if (!isSuperUser) return;
     try {
+      // Get all unique member IDs from all departments
+      const allMemberIds = new Set<string>();
+      departments.forEach(dept => {
+        dept.memberIds?.forEach(id => allMemberIds.add(id));
+        dept.adminIds?.forEach(id => allMemberIds.add(id));
+      });
+
+      if (allMemberIds.size === 0) {
+        setUsers([]);
+        return;
+      }
+
+      // Fetch user details for each member
       const res = await fetch('/api/users', {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
       if (data.success) {
-        setUsers(data.data.map((u: User) => ({
-          id: u.id,
-          name: u.name || u.email,
-          email: u.email,
-        })));
+        // Filter to only include department members
+        const departmentMembers = data.data
+          .filter((u: User) => allMemberIds.has(u.id))
+          .map((u: User) => ({
+            id: u.id,
+            name: u.name || u.email,
+            email: u.email,
+          }));
+        setUsers(departmentMembers);
       }
     } catch (error) {
       console.error('Error fetching users:', error);
     }
-  }, [token, isSuperUser]);
+  }, [token, isSuperUser, departments]);
 
   // Open admin modal
   const openAdminModal = () => {
