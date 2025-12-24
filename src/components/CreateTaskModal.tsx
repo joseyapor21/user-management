@@ -294,30 +294,31 @@ export default function CreateTaskModal({
               </select>
             </div>
 
-            {/* Due Date */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
+            {/* Due Date & Time */}
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Due Date & Time</label>
               <input
-                type="date"
+                type="datetime-local"
                 value={form.dueDate}
                 onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900"
               />
             </div>
 
-            {/* Estimated Hours */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Est. Hours</label>
-              <input
-                type="number"
-                min="0"
-                step="0.5"
-                value={form.estimatedHours || ''}
-                onChange={(e) => setForm({ ...form, estimatedHours: parseFloat(e.target.value) || 0 })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900"
-                placeholder="0"
-              />
-            </div>
+          </div>
+
+          {/* Estimated Hours */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Est. Hours</label>
+            <input
+              type="number"
+              min="0"
+              step="0.5"
+              value={form.estimatedHours || ''}
+              onChange={(e) => setForm({ ...form, estimatedHours: parseFloat(e.target.value) || 0 })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900"
+              placeholder="0"
+            />
           </div>
 
           {/* Recurrence Section */}

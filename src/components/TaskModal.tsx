@@ -260,7 +260,7 @@ export default function TaskModal({
   };
 
   const handleDelete = async () => {
-    if (!confirm('Are you sure you want to delete this task?')) return;
+    if (!confirm('Move this task to drafts? You can restore it later.')) return;
 
     setDeleting(true);
     try {
@@ -279,10 +279,10 @@ export default function TaskModal({
         onDelete();
       } else {
         const data = await res.json();
-        showError(data.error || 'Failed to delete task');
+        showError(data.error || 'Failed to move task to drafts');
       }
     } catch {
-      showError('Failed to delete task');
+      showError('Failed to move task to drafts');
     } finally {
       setDeleting(false);
     }
@@ -610,11 +610,11 @@ export default function TaskModal({
                   </select>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Due Date & Time</label>
                   <input
-                    type="date"
-                    value={form.dueDate ? form.dueDate.split('T')[0] : ''}
+                    type="datetime-local"
+                    value={form.dueDate ? form.dueDate.slice(0, 16) : ''}
                     onChange={(e) => setForm({ ...form, dueDate: e.target.value ? new Date(e.target.value).toISOString() : '' })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900"
                   />
@@ -909,7 +909,7 @@ export default function TaskModal({
                           ? 'text-red-600'
                           : 'text-gray-800'
                       }`}>
-                        {project.dueDate ? new Date(project.dueDate).toLocaleDateString() : 'No due date'}
+                        {project.dueDate ? new Date(project.dueDate).toLocaleString() : 'No due date'}
                         {project.dueDate && new Date(project.dueDate) < new Date() && ' (Overdue)'}
                       </span>
                     </div>
@@ -1354,9 +1354,9 @@ export default function TaskModal({
               <button
                 onClick={handleDelete}
                 disabled={deleting}
-                className="px-4 py-2 bg-red-600 text-white rounded-md text-sm hover:bg-red-700 disabled:opacity-50"
+                className="px-4 py-2 bg-orange-600 text-white rounded-md text-sm hover:bg-orange-700 disabled:opacity-50"
               >
-                {deleting ? 'Deleting...' : 'Delete'}
+                {deleting ? 'Moving...' : 'Move to Drafts'}
               </button>
             )}
           </div>

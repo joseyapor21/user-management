@@ -84,6 +84,9 @@ export async function GET(request: NextRequest) {
     // Get user's accessible departments
     const accessibleDepts = await getUserDepartments(userInfo.userId, userInfo.isSuperUser);
 
+    // Check if requesting archived/drafts
+    const showArchived = searchParams.get('archived') === 'true';
+
     // Build query based on filters
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let query: any;
@@ -100,6 +103,14 @@ export async function GET(request: NextRequest) {
     } else {
       // Show tasks from all accessible departments
       query = { departmentId: { $in: accessibleDepts } };
+    }
+
+    // Filter by archived status
+    if (showArchived) {
+      query.status = 'archived';
+    } else {
+      // Exclude archived tasks from regular view
+      query.status = { $ne: 'archived' };
     }
 
     const projects = await db
@@ -320,7 +331,7 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-// DELETE - Delete project (Admin only)
+// DELETE - Soft delete (archive) project (Admin only)
 export async function DELETE(request: NextRequest) {
   const userInfo = await getUserFromRequest(request);
   if (!userInfo) {
@@ -330,6 +341,7 @@ export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
+    const permanent = searchParams.get('permanent') === 'true';
 
     if (!id) {
       return NextResponse.json({ error: 'Project ID is required' }, { status: 400 });
@@ -349,12 +361,49 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Only department admins can delete tasks' }, { status: 403 });
     }
 
-    await db.collection(COLLECTION_NAME).deleteOne({ _id: new ObjectId(id) });
+    if (permanent) {
+      // Permanently delete the task (only for archived tasks)
+      await db.collection(COLLECTION_NAME).deleteOne({ _id: new ObjectId(id) });
+      return NextResponse.json({
+        success: true,
+        message: 'Project permanently deleted',
+      });
+    } else {
+      // Soft delete - move to archived status
+      const now = new Date().toISOString();
+      const activityEntry = {
+        id: new ObjectId().toString(),
+        userId: userInfo.userId,
+        userName: userInfo.userName,
+        action: 'archived',
+        details: 'Task moved to drafts',
+        timestamp: now,
+      };
 
-    return NextResponse.json({
-      success: true,
-      message: 'Project deleted successfully',
-    });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const archiveOperation: any = {
+        $set: {
+          status: 'archived',
+          previousStatus: existingProject.status,
+          archivedAt: now,
+          archivedBy: userInfo.userId,
+          'metadata.updatedAt': now,
+        },
+        $push: {
+          activityLog: activityEntry
+        }
+      };
+
+      await db.collection(COLLECTION_NAME).updateOne(
+        { _id: new ObjectId(id) },
+        archiveOperation
+      );
+
+      return NextResponse.json({
+        success: true,
+        message: 'Project moved to drafts',
+      });
+    }
   } catch (error) {
     console.error('Delete project error:', error);
     return NextResponse.json({ error: 'Failed to delete project' }, { status: 500 });

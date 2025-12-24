@@ -21,6 +21,7 @@ const columnColors: Record<ProjectStatus, { header: string; bg: string }> = {
   todo: { header: 'bg-blue-500', bg: 'bg-blue-50' },
   in_progress: { header: 'bg-yellow-500', bg: 'bg-yellow-50' },
   done: { header: 'bg-green-500', bg: 'bg-green-50' },
+  archived: { header: 'bg-orange-500', bg: 'bg-orange-50' },
 };
 
 // Helper to determine if a color is light or dark

@@ -33,7 +33,7 @@ export interface AuthUser {
 }
 
 // Project/Task types for Kanban board
-export type ProjectStatus = 'backlog' | 'todo' | 'in_progress' | 'done';
+export type ProjectStatus = 'backlog' | 'todo' | 'in_progress' | 'done' | 'archived';
 export type Priority = 'low' | 'medium' | 'high' | 'urgent';
 
 // Label colors for categorizing tasks
@@ -210,6 +210,10 @@ export interface Project {
   recurrence?: RecurrenceConfig;  // Recurring task configuration
   parentRecurringId?: string;  // Reference to parent recurring task
   order: number;
+  // Archive/draft fields
+  previousStatus?: string;
+  archivedAt?: string;
+  archivedBy?: string;
   metadata: {
     createdAt: string;
     updatedAt: string;

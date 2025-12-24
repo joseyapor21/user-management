@@ -8,6 +8,7 @@ import CreateTaskModal from './CreateTaskModal';
 import CalendarView from './CalendarView';
 import ColumnManager from './ColumnManager';
 import TemplateSelector from './TemplateSelector';
+import DraftsModal from './DraftsModal';
 import { useNotifications } from '@/hooks/useNotifications';
 
 interface KanbanBoardProps {
@@ -45,6 +46,7 @@ export default function KanbanBoard({ token, departments, userId, isSuperUser, i
   const [customColumns, setCustomColumns] = useState<CustomColumn[]>(DEFAULT_COLUMNS);
   const [showColumnManager, setShowColumnManager] = useState(false);
   const [showTemplateSelector, setShowTemplateSelector] = useState(false);
+  const [showDraftsModal, setShowDraftsModal] = useState(false);
   const { showToast, showError } = useNotifications();
 
   // Check if user can manage tasks (is admin of any department or superuser)
@@ -462,6 +464,19 @@ export default function KanbanBoard({ token, departments, userId, isSuperUser, i
             Stats
           </button>
 
+          {/* Drafts button */}
+          {canManageTasks && (
+            <button
+              onClick={() => setShowDraftsModal(true)}
+              className="hidden sm:flex order-5 px-3 py-2 text-sm rounded-md items-center gap-2 bg-gray-100 text-gray-700 hover:bg-gray-200"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+              </svg>
+              Drafts
+            </button>
+          )}
+
           {/* Column manager button - only show when a specific department is selected */}
           {selectedDepartment !== 'all' && canManageTasks && (
             <>
@@ -801,6 +816,20 @@ export default function KanbanBoard({ token, departments, userId, isSuperUser, i
             setCustomColumns(newColumns);
             setShowTemplateSelector(false);
             fetchProjects(); // Refresh to see any sample tasks
+          }}
+        />
+      )}
+
+      {/* Drafts Modal */}
+      {showDraftsModal && (
+        <DraftsModal
+          token={token}
+          userId={userId}
+          isSuperUser={isSuperUser}
+          departments={departments}
+          onClose={() => setShowDraftsModal(false)}
+          onRestore={() => {
+            fetchProjects();
           }}
         />
       )}
