@@ -548,6 +548,7 @@ export default function DashboardPage() {
             token={token!}
             departments={departments}
             userId={user.id}
+            userName={user.name}
             isSuperUser={user.isSuperUser}
             isAdmin={user.isAdmin}
           />

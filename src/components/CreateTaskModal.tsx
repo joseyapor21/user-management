@@ -166,6 +166,8 @@ export default function CreateTaskModal({
 
         // Send push notification to all assignees
         const assigneesToNotify = allAssignees.filter(id => id !== userId);
+        const departmentName = departments.find(d => d.id === form.departmentId)?.name || '';
+
         assigneesToNotify.forEach(assigneeId => {
           fetch('/api/push/send', {
             method: 'POST',
@@ -177,8 +179,12 @@ export default function CreateTaskModal({
               userId: assigneeId,
               notification: {
                 title: 'New Task Assigned',
-                body: `You've been assigned to "${form.title}"`,
+                body: `"${form.title}"${form.description ? ': ' + form.description.substring(0, 50) : ''}`,
                 url: `/dashboard`,
+                taskId: data.id,
+                department: departmentName,
+                priority: form.priority,
+                dueDate: form.dueDate,
               },
             }),
           }).catch(() => {});

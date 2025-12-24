@@ -8,6 +8,7 @@ interface TaskModalProps {
   project: Project;
   token: string;
   userId: string;
+  userName: string;
   isSuperUser: boolean;
   departments: Department[];
   onClose: () => void;
@@ -44,6 +45,7 @@ export default function TaskModal({
   project,
   token,
   userId,
+  userName,
   isSuperUser,
   departments,
   onClose,
@@ -220,9 +222,14 @@ export default function TaskModal({
             body: JSON.stringify({
               userId: newAssigneeId,
               notification: {
-                title: 'Task Assigned',
-                body: `You've been assigned to "${form.title}"`,
+                title: 'Task Assigned to You',
+                body: `"${form.title}"`,
                 url: `/dashboard`,
+                taskId: project.id,
+                department: project.departmentName,
+                priority: form.priority,
+                dueDate: form.dueDate,
+                byUser: userName,
               },
             }),
           }).catch(() => {});
@@ -240,8 +247,13 @@ export default function TaskModal({
               userId: project.assigneeId,
               notification: {
                 title: 'Task Updated',
-                body: `"${form.title}" was updated (${changedFields.join(', ')})`,
+                body: `"${form.title}" - ${changedFields.join(', ')} changed`,
                 url: `/dashboard`,
+                taskId: project.id,
+                department: project.departmentName,
+                priority: form.priority,
+                dueDate: form.dueDate,
+                byUser: userName,
               },
             }),
           }).catch(() => {});
@@ -319,6 +331,9 @@ export default function TaskModal({
           usersToNotify.push(project.createdBy);
         }
 
+        // Truncate comment for notification preview
+        const commentPreview = newComment.length > 50 ? newComment.substring(0, 50) + '...' : newComment;
+
         usersToNotify.forEach((targetUserId) => {
           fetch('/api/push/send', {
             method: 'POST',
@@ -330,8 +345,12 @@ export default function TaskModal({
               userId: targetUserId,
               notification: {
                 title: 'New Comment',
-                body: `New comment on "${project.title}"`,
+                body: `"${project.title}": ${commentPreview}`,
                 url: `/dashboard`,
+                taskId: project.id,
+                department: project.departmentName,
+                priority: project.priority,
+                byUser: userName,
               },
             }),
           }).catch(() => {});

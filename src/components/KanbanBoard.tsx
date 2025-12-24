@@ -15,6 +15,7 @@ interface KanbanBoardProps {
   token: string;
   departments: Department[];
   userId: string;
+  userName: string;
   isSuperUser: boolean;
   isAdmin: boolean;
 }
@@ -28,7 +29,7 @@ const DEFAULT_COLUMNS: CustomColumn[] = [
 
 type DueDateFilter = 'all' | 'overdue' | 'today' | 'week' | 'no_date';
 
-export default function KanbanBoard({ token, departments, userId, isSuperUser, isAdmin }: KanbanBoardProps) {
+export default function KanbanBoard({ token, departments, userId, userName, isSuperUser, isAdmin }: KanbanBoardProps) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
@@ -176,6 +177,15 @@ export default function KanbanBoard({ token, departments, userId, isSuperUser, i
 
         // Send push notification to assignee if different from current user
         if (draggedProject.assigneeId && draggedProject.assigneeId !== userId) {
+          const statusLabels: Record<string, string> = {
+            backlog: 'Backlog',
+            todo: 'To Do',
+            in_progress: 'In Progress',
+            done: 'Done',
+          };
+          const oldStatusLabel = statusLabels[oldStatus] || oldStatus;
+          const newStatusLabel = statusLabels[newStatus] || newStatus;
+
           fetch('/api/push/send', {
             method: 'POST',
             headers: {
@@ -186,8 +196,12 @@ export default function KanbanBoard({ token, departments, userId, isSuperUser, i
               userId: draggedProject.assigneeId,
               notification: {
                 title: 'Task Status Changed',
-                body: `"${draggedProject.title}" moved to ${newStatus.replace('_', ' ')}`,
+                body: `"${draggedProject.title}" moved from ${oldStatusLabel} to ${newStatusLabel}`,
                 url: `/dashboard`,
+                taskId: draggedProject.id,
+                department: draggedProject.departmentName,
+                priority: draggedProject.priority,
+                dueDate: draggedProject.dueDate,
               },
             }),
           }).catch(() => {});
@@ -770,6 +784,7 @@ export default function KanbanBoard({ token, departments, userId, isSuperUser, i
           project={selectedProject}
           token={token}
           userId={userId}
+          userName={userName}
           isSuperUser={isSuperUser}
           departments={departments}
           onClose={() => setSelectedProject(null)}
