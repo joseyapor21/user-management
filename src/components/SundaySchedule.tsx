@@ -26,6 +26,11 @@ interface SelectedUser {
   name: string;
 }
 
+interface ScheduleConfig {
+  departments: string[];
+  phases: string[];
+}
+
 // Get next Sunday from a date
 function getNextSunday(date: Date): Date {
   const d = new Date(date);
@@ -71,6 +76,17 @@ export default function SundaySchedule({ token, isSuperUser, departments }: Sund
   // Cell editing with user selector
   const [selectedUsers, setSelectedUsers] = useState<SelectedUser[]>([]);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
+
+  // Schedule configuration (custom departments and phases)
+  const [config, setConfig] = useState<ScheduleConfig>({
+    departments: [...SCHEDULE_DEPARTMENTS],
+    phases: [...SERVICE_PHASES],
+  });
+  const [showConfigModal, setShowConfigModal] = useState(false);
+  const [editingConfig, setEditingConfig] = useState<'departments' | 'phases' | null>(null);
+  const [newItemName, setNewItemName] = useState('');
+  const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
+  const [editingItemValue, setEditingItemValue] = useState('');
 
   // Build a map for quick slot lookup
   const getSlotValue = useCallback((phase: string, dept: string): string => {
@@ -153,6 +169,81 @@ export default function SundaySchedule({ token, isSuperUser, departments }: Sund
   useEffect(() => {
     fetchUsers();
   }, [fetchUsers]);
+
+  // Fetch schedule configuration
+  const fetchConfig = useCallback(async () => {
+    try {
+      const res = await fetch('/api/schedules/config', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success) {
+        setConfig({
+          departments: data.data.departments || [...SCHEDULE_DEPARTMENTS],
+          phases: data.data.phases || [...SERVICE_PHASES],
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching config:', error);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    fetchConfig();
+  }, [fetchConfig]);
+
+  // Save schedule configuration
+  const saveConfig = async (newConfig: Partial<ScheduleConfig>) => {
+    try {
+      await fetch('/api/schedules/config', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(newConfig),
+      });
+    } catch (error) {
+      console.error('Error saving config:', error);
+    }
+  };
+
+  // Add new department or phase
+  const addItem = async (type: 'departments' | 'phases') => {
+    if (!newItemName.trim()) return;
+    const newList = [...config[type], newItemName.trim()];
+    setConfig({ ...config, [type]: newList });
+    await saveConfig({ [type]: newList });
+    setNewItemName('');
+  };
+
+  // Delete department or phase
+  const deleteItem = async (type: 'departments' | 'phases', index: number) => {
+    const newList = config[type].filter((_, i) => i !== index);
+    setConfig({ ...config, [type]: newList });
+    await saveConfig({ [type]: newList });
+  };
+
+  // Rename department or phase
+  const renameItem = async (type: 'departments' | 'phases', index: number) => {
+    if (!editingItemValue.trim()) return;
+    const newList = [...config[type]];
+    newList[index] = editingItemValue.trim();
+    setConfig({ ...config, [type]: newList });
+    await saveConfig({ [type]: newList });
+    setEditingItemIndex(null);
+    setEditingItemValue('');
+  };
+
+  // Move item up/down
+  const moveItem = async (type: 'departments' | 'phases', index: number, direction: 'up' | 'down') => {
+    const newList = [...config[type]];
+    const newIndex = direction === 'up' ? index - 1 : index + 1;
+    if (newIndex < 0 || newIndex >= newList.length) return;
+    [newList[index], newList[newIndex]] = [newList[newIndex], newList[index]];
+    setConfig({ ...config, [type]: newList });
+    await saveConfig({ [type]: newList });
+  };
 
   // Open admin modal
   const openAdminModal = () => {
@@ -349,6 +440,139 @@ export default function SundaySchedule({ token, isSuperUser, departments }: Sund
         </div>
       )}
 
+      {/* Config Modal - Edit Departments/Phases */}
+      {showConfigModal && editingConfig && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={() => setShowConfigModal(false)}>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[80vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="p-4 border-b flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-800">
+                Edit {editingConfig === 'departments' ? 'Departments' : 'Phases'}
+              </h3>
+              <button onClick={() => setShowConfigModal(false)} className="text-gray-500 hover:text-gray-700 text-2xl">
+                &times;
+              </button>
+            </div>
+            <div className="p-4 overflow-y-auto max-h-[60vh]">
+              {/* Add new item */}
+              <div className="flex gap-2 mb-4">
+                <input
+                  type="text"
+                  value={newItemName}
+                  onChange={(e) => setNewItemName(e.target.value)}
+                  placeholder={`Add ${editingConfig === 'departments' ? 'department' : 'phase'}...`}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm bg-white text-gray-900"
+                  onKeyDown={(e) => e.key === 'Enter' && addItem(editingConfig)}
+                />
+                <button
+                  onClick={() => addItem(editingConfig)}
+                  className="px-3 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700"
+                >
+                  Add
+                </button>
+              </div>
+
+              {/* List items */}
+              <div className="space-y-2">
+                {config[editingConfig].map((item, index) => (
+                  <div key={index} className="flex items-center gap-2 p-2 bg-gray-50 rounded-md">
+                    {editingItemIndex === index ? (
+                      <>
+                        <input
+                          type="text"
+                          value={editingItemValue}
+                          onChange={(e) => setEditingItemValue(e.target.value)}
+                          className="flex-1 px-2 py-1 border border-blue-400 rounded text-sm bg-white text-gray-900"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') renameItem(editingConfig, index);
+                            if (e.key === 'Escape') {
+                              setEditingItemIndex(null);
+                              setEditingItemValue('');
+                            }
+                          }}
+                        />
+                        <button
+                          onClick={() => renameItem(editingConfig, index)}
+                          className="px-2 py-1 bg-green-600 text-white rounded text-xs"
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={() => {
+                            setEditingItemIndex(null);
+                            setEditingItemValue('');
+                          }}
+                          className="px-2 py-1 bg-gray-400 text-white rounded text-xs"
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <span className="flex-1 text-sm text-gray-700">{item}</span>
+                        <button
+                          onClick={() => moveItem(editingConfig, index, 'up')}
+                          disabled={index === 0}
+                          className="p-1 text-gray-500 hover:text-gray-700 disabled:opacity-30"
+                          title="Move up"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => moveItem(editingConfig, index, 'down')}
+                          disabled={index === config[editingConfig].length - 1}
+                          className="p-1 text-gray-500 hover:text-gray-700 disabled:opacity-30"
+                          title="Move down"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setEditingItemIndex(index);
+                            setEditingItemValue(item);
+                          }}
+                          className="p-1 text-blue-600 hover:text-blue-800"
+                          title="Edit"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (confirm(`Delete "${item}"?`)) {
+                              deleteItem(editingConfig, index);
+                            }
+                          }}
+                          className="p-1 text-red-600 hover:text-red-800"
+                          title="Delete"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="p-4 border-t">
+              <button
+                onClick={() => setShowConfigModal(false)}
+                className="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-md text-sm hover:bg-gray-300"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="bg-white p-4 rounded-lg shadow-sm">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -404,6 +628,38 @@ export default function SundaySchedule({ token, isSuperUser, departments }: Sund
             >
               Today
             </button>
+
+            {/* Config buttons for admins */}
+            {canEdit && (
+              <>
+                <button
+                  onClick={() => {
+                    setEditingConfig('phases');
+                    setShowConfigModal(true);
+                  }}
+                  className="px-3 py-2 text-sm bg-gray-100 rounded-md hover:bg-gray-200 flex items-center gap-1"
+                  title="Edit Phases"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
+                  <span className="hidden sm:inline">Phases</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setEditingConfig('departments');
+                    setShowConfigModal(true);
+                  }}
+                  className="px-3 py-2 text-sm bg-gray-100 rounded-md hover:bg-gray-200 flex items-center gap-1"
+                  title="Edit Departments"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+                  </svg>
+                  <span className="hidden sm:inline">Depts</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
 
@@ -424,7 +680,7 @@ export default function SundaySchedule({ token, isSuperUser, departments }: Sund
                 <th className="sticky left-0 z-10 bg-gray-100 px-3 py-2 text-left text-xs font-semibold text-gray-700 border-b border-r min-w-[120px]">
                   Phase
                 </th>
-                {SCHEDULE_DEPARTMENTS.map((dept) => (
+                {config.departments.map((dept) => (
                   <th
                     key={dept}
                     className="px-2 py-2 text-center text-xs font-semibold text-gray-700 border-b whitespace-nowrap min-w-[100px]"
@@ -435,12 +691,12 @@ export default function SundaySchedule({ token, isSuperUser, departments }: Sund
               </tr>
             </thead>
             <tbody>
-              {SERVICE_PHASES.map((phase, phaseIndex) => (
+              {config.phases.map((phase, phaseIndex) => (
                 <tr key={phase} className={phaseIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                   <td className="sticky left-0 z-10 px-3 py-2 text-sm font-medium text-gray-800 border-r whitespace-nowrap bg-inherit">
                     {phase}
                   </td>
-                  {SCHEDULE_DEPARTMENTS.map((dept) => {
+                  {config.departments.map((dept) => {
                     const isEditing = editingCell?.phase === phase && editingCell?.dept === dept;
                     const value = getSlotValue(phase, dept);
 
@@ -549,16 +805,18 @@ export default function SundaySchedule({ token, isSuperUser, departments }: Sund
         </div>
       </div>
 
-      {/* Legend / Help */}
-      <div className="bg-white p-4 rounded-lg shadow-sm">
-        <h3 className="text-sm font-semibold text-gray-700 mb-2">Instructions</h3>
-        <ul className="text-xs text-gray-600 space-y-1">
-          <li>• Click on any cell to edit the assigned person(s)</li>
-          <li>• Click &quot;+ Add user&quot; to select members from the dropdown</li>
-          <li>• Click Save to confirm or Cancel to discard changes</li>
-          <li>• Use arrows to navigate between Sundays</li>
-        </ul>
-      </div>
+      {/* Legend / Help - Only shown to admins who can edit */}
+      {canEdit && (
+        <div className="bg-white p-4 rounded-lg shadow-sm">
+          <h3 className="text-sm font-semibold text-gray-700 mb-2">Instructions</h3>
+          <ul className="text-xs text-gray-600 space-y-1">
+            <li>• Click on any cell to edit the assigned person(s)</li>
+            <li>• Click &quot;+ Add user&quot; to select members from the dropdown</li>
+            <li>• Click Save to confirm or Cancel to discard changes</li>
+            <li>• Use arrows to navigate between Sundays</li>
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
