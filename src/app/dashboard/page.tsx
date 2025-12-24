@@ -557,7 +557,6 @@ export default function DashboardPage() {
         {activeTab === 'schedule' && (
           <SundaySchedule
             token={token!}
-            userId={user.id}
             isSuperUser={user.isSuperUser}
           />
         )}

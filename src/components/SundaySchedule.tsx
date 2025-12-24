@@ -5,7 +5,6 @@ import { ScheduleSlot, SERVICE_PHASES, SCHEDULE_DEPARTMENTS, User } from '@/type
 
 interface SundayScheduleProps {
   token: string;
-  userId: string;
   isSuperUser: boolean;
 }
 
@@ -46,7 +45,7 @@ function formatDateForApi(date: Date): string {
   return date.toISOString().split('T')[0];
 }
 
-export default function SundaySchedule({ token, userId, isSuperUser }: SundayScheduleProps) {
+export default function SundaySchedule({ token, isSuperUser }: SundayScheduleProps) {
   const [selectedDate, setSelectedDate] = useState<Date>(getNextSunday(new Date()));
   const [schedule, setSchedule] = useState<ScheduleData | null>(null);
   const [loading, setLoading] = useState(true);
