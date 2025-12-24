@@ -54,15 +54,15 @@ export default function DraftsModal({
       }
     } catch (error) {
       console.error('Error fetching archived tasks:', error);
-      showError('Failed to load drafts');
     } finally {
       setLoading(false);
     }
-  }, [token, showError]);
+  }, [token]);
 
   useEffect(() => {
     fetchArchivedTasks();
-  }, [fetchArchivedTasks]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Restore a task
   const handleRestore = async (taskId: string) => {
@@ -142,8 +142,14 @@ export default function DraftsModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-0 md:p-4">
-      <div className="bg-white md:rounded-lg shadow-xl w-full h-full md:h-auto md:max-w-2xl md:max-h-[90vh] overflow-y-auto">
+    <div
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-0 md:p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white md:rounded-lg shadow-xl w-full h-full md:h-auto md:max-w-2xl md:max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="sticky top-0 bg-white p-4 border-b flex items-center justify-between z-10">
           <div>
