@@ -117,6 +117,72 @@ export interface TemplateSampleTask {
   status: string;  // Column id reference
 }
 
+// Sunday Schedule types
+export interface ScheduleSlot {
+  phase: string;
+  department: string;
+  assignees: string;  // Names of assigned people (free text)
+}
+
+export interface SundaySchedule {
+  id: string;
+  _id?: string;
+  date: string;  // ISO date string (Sunday date)
+  slots: ScheduleSlot[];
+  createdBy: string;
+  lastModifiedBy: string;
+  metadata: {
+    createdAt: string;
+    updatedAt: string;
+  };
+}
+
+// Schedule configuration - who can edit
+export interface ScheduleConfig {
+  scheduleAdminId: string | null;  // User ID of the schedule admin
+  scheduleAdminName?: string;
+}
+
+// Default service phases
+export const SERVICE_PHASES = [
+  'Before the Service',
+  'Opening',
+  'Worship',
+  'Testimonies',
+  'Sermon',
+  'Prayer Line Intro',
+  'Prayer Line',
+  'Laying of Hands',
+  'Mass Prayer',
+  'Offering',
+  'Grace',
+  'After Service',
+] as const;
+
+// Default departments for schedule
+export const SCHEDULE_DEPARTMENTS = [
+  'LAUNDROMAT',
+  'CAMERA',
+  'Sound Dept.',
+  'Media/Display',
+  'SERMON',
+  'SUNDAY SERVICE OPENING',
+  'TRANSPORTATION',
+  'PROTOCOL',
+  'Photo Dept.',
+  'Confirmation',
+  'Office',
+  'Testimony interview',
+  'Accounting',
+  'Microphone',
+  'Translation',
+  'Emergency',
+  'Sunday School',
+  'Usher',
+  'Cleaning',
+  'Worship',
+] as const;
+
 export interface Project {
   id: string;
   _id?: string;

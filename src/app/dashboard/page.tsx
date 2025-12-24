@@ -7,10 +7,11 @@ import { User, Department } from '@/types';
 import DepartmentCard from '@/components/DepartmentCard';
 import UserSearchModal from '@/components/UserSearchModal';
 import KanbanBoard from '@/components/KanbanBoard';
+import SundaySchedule from '@/components/SundaySchedule';
 import PushNotificationPrompt from '@/components/PushNotificationPrompt';
 import NotificationBell from '@/components/NotificationBell';
 
-type Tab = 'departments' | 'users' | 'projects' | 'invites';
+type Tab = 'departments' | 'users' | 'projects' | 'invites' | 'schedule';
 
 interface Invite {
   id: string;
@@ -524,6 +525,12 @@ export default function DashboardPage() {
               Invites
             </button>
           )}
+          <button
+            onClick={() => setActiveTab('schedule')}
+            className={`pb-2 px-3 md:px-4 whitespace-nowrap text-sm md:text-base ${activeTab === 'schedule' ? 'border-b-2 border-blue-600 text-blue-600 font-medium' : 'text-gray-600'}`}
+          >
+            Schedule
+          </button>
         </div>
       </div>
 
@@ -543,6 +550,15 @@ export default function DashboardPage() {
             userId={user.id}
             isSuperUser={user.isSuperUser}
             isAdmin={user.isAdmin}
+          />
+        )}
+
+        {/* Schedule Tab */}
+        {activeTab === 'schedule' && (
+          <SundaySchedule
+            token={token!}
+            userId={user.id}
+            isSuperUser={user.isSuperUser}
           />
         )}
 
