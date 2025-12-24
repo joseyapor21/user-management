@@ -59,6 +59,9 @@ export default function DashboardPage() {
   const [creatingInvite, setCreatingInvite] = useState(false);
   const [copiedInviteId, setCopiedInviteId] = useState<string | null>(null);
 
+  // Mobile menu state
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
+
   const fetchData = useCallback(async () => {
     setLoadingData(true);
     try {
@@ -423,10 +426,12 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Header */}
-      <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-xl font-bold text-gray-800">Dashboard - CCOAN New York</h1>
-          <div className="flex items-center gap-4">
+      <header className="bg-white shadow sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+          <h1 className="text-lg md:text-xl font-bold text-gray-800 truncate">CCOAN New York</h1>
+
+          {/* Desktop navigation */}
+          <div className="hidden md:flex items-center gap-4">
             <NotificationBell token={token || ''} />
             <span className="text-sm text-gray-600">
               {user.name || user.email} {user.isSuperUser && <span className="text-blue-600">(SuperUser)</span>}
@@ -444,36 +449,77 @@ export default function DashboardPage() {
               Logout
             </button>
           </div>
+
+          {/* Mobile navigation */}
+          <div className="flex md:hidden items-center gap-2">
+            <NotificationBell token={token || ''} />
+            <button
+              onClick={() => setShowMobileMenu(!showMobileMenu)}
+              className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                {showMobileMenu ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                )}
+              </svg>
+            </button>
+          </div>
         </div>
+
+        {/* Mobile menu dropdown */}
+        {showMobileMenu && (
+          <div className="md:hidden border-t bg-white px-4 py-3 space-y-3">
+            <div className="text-sm text-gray-600 font-medium">
+              {user.name || user.email}
+              {user.isSuperUser && <span className="ml-2 text-blue-600">(SuperUser)</span>}
+            </div>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => { openProfileModal(); setShowMobileMenu(false); }}
+                className="text-left text-sm text-blue-600 hover:text-blue-800 py-1"
+              >
+                Edit Profile
+              </button>
+              <button
+                onClick={() => { logout(); setShowMobileMenu(false); }}
+                className="text-left text-sm text-red-600 hover:text-red-800 py-1"
+              >
+                Logout
+              </button>
+            </div>
+          </div>
+        )}
       </header>
 
       {/* Tabs */}
-      <div className="max-w-7xl mx-auto px-4 py-4">
-        <div className="flex gap-4 border-b border-gray-200">
+      <div className="max-w-7xl mx-auto px-4 py-2 md:py-4">
+        <div className="flex gap-1 md:gap-4 border-b border-gray-200 overflow-x-auto scrollbar-hide">
           <button
             onClick={() => setActiveTab('projects')}
-            className={`pb-2 px-4 ${activeTab === 'projects' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-600'}`}
+            className={`pb-2 px-3 md:px-4 whitespace-nowrap text-sm md:text-base ${activeTab === 'projects' ? 'border-b-2 border-blue-600 text-blue-600 font-medium' : 'text-gray-600'}`}
           >
             Projects
           </button>
           <button
             onClick={() => setActiveTab('departments')}
-            className={`pb-2 px-4 ${activeTab === 'departments' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-600'}`}
+            className={`pb-2 px-3 md:px-4 whitespace-nowrap text-sm md:text-base ${activeTab === 'departments' ? 'border-b-2 border-blue-600 text-blue-600 font-medium' : 'text-gray-600'}`}
           >
             Departments
           </button>
           {user.isSuperUser && (
             <button
               onClick={() => setActiveTab('users')}
-              className={`pb-2 px-4 ${activeTab === 'users' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-600'}`}
+              className={`pb-2 px-3 md:px-4 whitespace-nowrap text-sm md:text-base ${activeTab === 'users' ? 'border-b-2 border-blue-600 text-blue-600 font-medium' : 'text-gray-600'}`}
             >
-              All Users
+              Users
             </button>
           )}
           {(user.isSuperUser || user.isAdmin) && (
             <button
               onClick={() => setActiveTab('invites')}
-              className={`pb-2 px-4 ${activeTab === 'invites' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-600'}`}
+              className={`pb-2 px-3 md:px-4 whitespace-nowrap text-sm md:text-base ${activeTab === 'invites' ? 'border-b-2 border-blue-600 text-blue-600 font-medium' : 'text-gray-600'}`}
             >
               Invites
             </button>

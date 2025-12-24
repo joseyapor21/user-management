@@ -130,12 +130,12 @@ export default function ColumnManager({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-0 md:p-4">
+      <div className="bg-white md:rounded-lg shadow-xl w-full h-full md:h-auto md:max-w-lg md:max-h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="p-4 border-b flex items-center justify-between">
+        <div className="sticky top-0 bg-white p-4 border-b flex items-center justify-between z-10">
           <h2 className="text-lg font-semibold text-gray-800">Customize Columns</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 text-2xl">
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 text-2xl p-1 touch-manipulation">
             &times;
           </button>
         </div>

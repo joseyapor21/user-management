@@ -530,14 +530,14 @@ export default function TaskModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-0 md:p-4">
+      <div className="bg-white md:rounded-lg shadow-xl w-full h-full md:h-auto md:max-w-2xl md:max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="p-4 border-b flex items-center justify-between">
+        <div className="sticky top-0 bg-white p-4 border-b flex items-center justify-between z-10">
           <h2 className="text-lg font-semibold text-gray-800">
             {isEditing ? 'Edit Task' : 'Task Details'}
           </h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 text-2xl">
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 text-2xl p-1 touch-manipulation">
             &times;
           </button>
         </div>
@@ -567,7 +567,7 @@ export default function TaskModal({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                   <select
@@ -883,7 +883,7 @@ export default function TaskModal({
               {/* Tab Content */}
               {activeTab === 'details' && (
                 <>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-sm">
                     <div>
                       <span className="text-gray-500">Status:</span>
                       <span className="ml-2 font-medium text-gray-800">

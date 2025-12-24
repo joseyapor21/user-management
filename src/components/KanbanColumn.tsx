@@ -68,7 +68,7 @@ export default function KanbanColumn({
 
   return (
     <div
-      className={`flex flex-col rounded-lg min-w-[280px] max-w-[320px] flex-1 ${!columnColor ? colors.bg : ''}`}
+      className={`flex flex-col rounded-lg w-[75vw] sm:w-[280px] md:min-w-[280px] md:max-w-[320px] flex-shrink-0 md:flex-1 snap-center ${!columnColor ? colors.bg : ''}`}
       style={bgStyle}
     >
       {/* Column Header */}
@@ -85,10 +85,10 @@ export default function KanbanColumn({
         {canAddTask && onAddTask && (
           <button
             onClick={onAddTask}
-            className="hover:bg-white hover:bg-opacity-20 rounded p-1 transition-colors"
+            className="hover:bg-white hover:bg-opacity-20 rounded p-1.5 transition-colors touch-manipulation"
             title="Add task"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
           </button>
@@ -97,7 +97,7 @@ export default function KanbanColumn({
 
       {/* Tasks Container */}
       <div
-        className="flex-1 p-2 space-y-2 overflow-y-auto min-h-[200px] max-h-[calc(100vh-300px)]"
+        className="flex-1 p-2 space-y-2 overflow-y-auto min-h-[150px] md:min-h-[200px] max-h-[calc(100vh-280px)] md:max-h-[calc(100vh-300px)]"
         onDragOver={onDragOver}
         onDrop={(e) => onDrop(e, status)}
       >
