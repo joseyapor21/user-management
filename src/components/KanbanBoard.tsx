@@ -704,7 +704,7 @@ export default function KanbanBoard({ token, departments, userId, userName, isSu
 
       {/* Kanban Columns - Swimlane View */}
       {boardView === 'swimlane' && (
-        <div className="space-y-6 overflow-x-auto pb-4">
+        <div className="space-y-4 pb-4">
           {swimlanes.map((swimlane) => {
             const swimlaneTaskCount = customColumns.reduce(
               (acc, col) => acc + getProjectsByStatusAndSwimlane(col.id, swimlane.key).length,
@@ -714,30 +714,30 @@ export default function KanbanBoard({ token, departments, userId, userName, isSu
             if (swimlaneTaskCount === 0 && swimlaneBy === 'assignee') return null;
 
             return (
-              <div key={swimlane.key} className={`rounded-lg border ${swimlane.color} p-4`}>
+              <div key={swimlane.key} className={`rounded-lg border ${swimlane.color} p-3 md:p-4`}>
                 {/* Swimlane Header */}
-                <div className="flex items-center gap-2 mb-4">
+                <div className="flex items-center gap-2 mb-3">
                   <h3 className="font-semibold text-gray-800">{swimlane.label}</h3>
                   <span className="text-sm text-gray-500">({swimlaneTaskCount} tasks)</span>
                 </div>
 
-                {/* Columns within swimlane */}
-                <div className="flex gap-4">
+                {/* Columns within swimlane - vertical on mobile, horizontal on desktop */}
+                <div className="flex flex-col md:flex-row gap-3 md:gap-4">
                   {customColumns.sort((a, b) => a.order - b.order).map((column) => {
                     const tasks = getProjectsByStatusAndSwimlane(column.id, swimlane.key);
                     return (
                       <div
                         key={`${swimlane.key}-${column.id}`}
-                        className="flex-1 min-w-[250px] bg-white rounded-lg shadow-sm"
+                        className="w-full md:flex-1 md:min-w-[200px] bg-white rounded-lg shadow-sm"
                         onDragOver={handleDragOver}
                         onDrop={(e) => handleDrop(e, column.id)}
                       >
-                        <div className="p-3 border-b border-gray-100">
+                        <div className="p-2 md:p-3 border-b border-gray-100">
                           <h4 className="text-sm font-medium text-gray-600">
                             {column.name} <span className="text-gray-400">({tasks.length})</span>
                           </h4>
                         </div>
-                        <div className="p-2 space-y-2 min-h-[100px]">
+                        <div className="p-2 space-y-2 min-h-[60px] md:min-h-[100px] max-h-[200px] md:max-h-none overflow-y-auto">
                           {tasks.map((project) => (
                             <div
                               key={project.id}
