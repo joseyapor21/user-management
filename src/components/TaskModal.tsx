@@ -552,13 +552,64 @@ export default function TaskModal({
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-0 md:p-4">
       <div className="bg-white md:rounded-lg shadow-xl w-full h-full md:h-auto md:max-w-2xl md:max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="sticky top-0 bg-white p-4 border-b flex items-center justify-between z-10">
-          <h2 className="text-lg font-semibold text-gray-800">
-            {isEditing ? 'Edit Task' : 'Task Details'}
-          </h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 text-2xl p-1 touch-manipulation">
-            &times;
-          </button>
+        <div className="sticky top-0 bg-white z-10">
+          <div className="p-4 border-b flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-800">
+              {isEditing ? 'Edit Task' : 'Task Details'}
+            </h2>
+            <button onClick={onClose} className="text-gray-500 hover:text-gray-700 text-2xl p-1 touch-manipulation">
+              &times;
+            </button>
+          </div>
+
+          {/* Quick Move To - Status Bar */}
+          {!isEditing && canChangeStatus && (
+            <div className="px-4 py-2 bg-gray-50 border-b">
+              <div className="flex items-center gap-2 overflow-x-auto">
+                <span className="text-xs text-gray-500 whitespace-nowrap">Move to:</span>
+                {statusOptions.map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={async () => {
+                      if (project.status === opt.value) return;
+                      try {
+                        const res = await fetch('/api/projects', {
+                          method: 'PUT',
+                          headers: {
+                            'Content-Type': 'application/json',
+                            Authorization: `Bearer ${token}`,
+                          },
+                          body: JSON.stringify({ id: project.id, status: opt.value }),
+                        });
+                        if (res.ok) {
+                          showToast({
+                            type: 'task_moved',
+                            taskTitle: project.title,
+                            taskId: project.id,
+                            byUser: 'You',
+                            details: {
+                              oldStatus: project.status,
+                              newStatus: opt.value,
+                            },
+                          });
+                          onUpdate();
+                        }
+                      } catch {
+                        showError('Failed to move task');
+                      }
+                    }}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-full whitespace-nowrap transition-colors ${
+                      project.status === opt.value
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-100'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Content */}
@@ -1037,37 +1088,6 @@ export default function TaskModal({
                     </div>
                   )}
 
-                  {/* Quick Status Change for assignees */}
-                  {canChangeStatus && !canEdit && (
-                    <div className="pt-4 border-t">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Change Status</label>
-                      <div className="flex gap-2">
-                        {statusOptions.map((opt) => (
-                          <button
-                            key={opt.value}
-                            onClick={async () => {
-                              await fetch('/api/projects', {
-                                method: 'PUT',
-                                headers: {
-                                  'Content-Type': 'application/json',
-                                  Authorization: `Bearer ${token}`,
-                                },
-                                body: JSON.stringify({ id: project.id, status: opt.value }),
-                              });
-                              onUpdate();
-                            }}
-                            className={`px-3 py-1 text-sm rounded-md ${
-                              project.status === opt.value
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
-                          >
-                            {opt.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </>
               )}
 

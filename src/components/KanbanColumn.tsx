@@ -14,6 +14,7 @@ interface KanbanColumnProps {
   onAddTask?: () => void;
   canAddTask: boolean;
   columnColor?: string;
+  isMobileVertical?: boolean;
 }
 
 const columnColors: Record<ProjectStatus, { header: string; bg: string }> = {
@@ -59,6 +60,7 @@ export default function KanbanColumn({
   onAddTask,
   canAddTask,
   columnColor,
+  isMobileVertical = false,
 }: KanbanColumnProps) {
   const colors = columnColors[status];
 
@@ -67,9 +69,15 @@ export default function KanbanColumn({
   const bgStyle = columnColor ? { backgroundColor: lightenColor(columnColor, 90) } : undefined;
   const textColorClass = columnColor && isLightColor(columnColor) ? 'text-gray-800' : 'text-white';
 
+  // Mobile vertical layout: full width, compact height
+  // Desktop: original horizontal layout
+  const columnClasses = isMobileVertical
+    ? `flex flex-col rounded-lg w-full md:min-w-[280px] md:max-w-[320px] flex-shrink-0 md:flex-1 ${!columnColor ? colors.bg : ''}`
+    : `flex flex-col rounded-lg w-[75vw] sm:w-[280px] md:min-w-[280px] md:max-w-[320px] flex-shrink-0 md:flex-1 snap-center ${!columnColor ? colors.bg : ''}`;
+
   return (
     <div
-      className={`flex flex-col rounded-lg w-[75vw] sm:w-[280px] md:min-w-[280px] md:max-w-[320px] flex-shrink-0 md:flex-1 snap-center ${!columnColor ? colors.bg : ''}`}
+      className={columnClasses}
       style={bgStyle}
     >
       {/* Column Header */}
@@ -98,7 +106,11 @@ export default function KanbanColumn({
 
       {/* Tasks Container */}
       <div
-        className="flex-1 p-2 space-y-2 overflow-y-auto min-h-[150px] md:min-h-[200px] max-h-[calc(100vh-280px)] md:max-h-[calc(100vh-300px)]"
+        className={`flex-1 p-2 space-y-2 overflow-y-auto ${
+          isMobileVertical
+            ? 'min-h-[80px] max-h-[250px] md:min-h-[200px] md:max-h-[calc(100vh-300px)]'
+            : 'min-h-[150px] md:min-h-[200px] max-h-[calc(100vh-280px)] md:max-h-[calc(100vh-300px)]'
+        }`}
         onDragOver={onDragOver}
         onDrop={(e) => onDrop(e, status)}
       >

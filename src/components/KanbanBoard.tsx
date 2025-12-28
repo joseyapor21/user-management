@@ -682,7 +682,7 @@ export default function KanbanBoard({ token, departments, userId, userName, isSu
 
       {/* Kanban Columns - Standard View */}
       {boardView === 'standard' && (
-        <div className="flex gap-3 md:gap-4 overflow-x-auto pb-4 -mx-4 px-4 md:mx-0 md:px-0 snap-x snap-mandatory md:snap-none">
+        <div className="flex flex-col md:flex-row gap-3 md:gap-4 overflow-y-auto md:overflow-x-auto pb-4 md:-mx-0 md:px-0">
           {customColumns.sort((a, b) => a.order - b.order).map((column) => (
             <KanbanColumn
               key={column.id}
@@ -696,6 +696,7 @@ export default function KanbanBoard({ token, departments, userId, userName, isSu
               onAddTask={() => handleAddTask(column.id)}
               canAddTask={canManageTasks}
               columnColor={column.color}
+              isMobileVertical={true}
             />
           ))}
         </div>
