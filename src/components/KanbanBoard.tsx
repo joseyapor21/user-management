@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { Project, ProjectStatus, Department, Priority, CustomColumn } from '@/types';
 import KanbanColumn from './KanbanColumn';
 import TaskModal from './TaskModal';
@@ -30,6 +31,8 @@ const DEFAULT_COLUMNS: CustomColumn[] = [
 type DueDateFilter = 'all' | 'overdue' | 'today' | 'week' | 'no_date';
 
 export default function KanbanBoard({ token, departments, userId, userName, isSuperUser, isAdmin }: KanbanBoardProps) {
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
@@ -48,6 +51,7 @@ export default function KanbanBoard({ token, departments, userId, userName, isSu
   const [showColumnManager, setShowColumnManager] = useState(false);
   const [showTemplateSelector, setShowTemplateSelector] = useState(false);
   const [showDraftsModal, setShowDraftsModal] = useState(false);
+  const [pendingTaskId, setPendingTaskId] = useState<string | null>(null);
   const { showToast, showError } = useNotifications();
 
   // Check if user can manage tasks (is admin of any department or superuser)
@@ -113,6 +117,66 @@ export default function KanbanBoard({ token, departments, userId, userName, isSu
   useEffect(() => {
     fetchColumns(selectedDepartment);
   }, [selectedDepartment, fetchColumns]);
+
+  // Check URL for openTask parameter (from push notification click)
+  useEffect(() => {
+    const openTaskId = searchParams.get('openTask');
+    if (openTaskId) {
+      setPendingTaskId(openTaskId);
+      // Clear the URL parameter without refreshing
+      router.replace('/dashboard', { scroll: false });
+    }
+  }, [searchParams, router]);
+
+  // Open task when projects are loaded and there's a pending task ID
+  useEffect(() => {
+    if (pendingTaskId && projects.length > 0 && !loading) {
+      const taskToOpen = projects.find(p => p.id === pendingTaskId);
+      if (taskToOpen) {
+        setSelectedProject(taskToOpen);
+      } else {
+        // Task might be in a different department, fetch it directly
+        fetch(`/api/projects?id=${pendingTaskId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+          .then(res => res.json())
+          .then(data => {
+            if (data.success && data.data) {
+              // If it's a single project, set it
+              const project = Array.isArray(data.data) ? data.data[0] : data.data;
+              if (project) {
+                setSelectedProject(project);
+              }
+            }
+          })
+          .catch(console.error);
+      }
+      setPendingTaskId(null);
+    }
+  }, [pendingTaskId, projects, loading, token]);
+
+  // Listen for service worker messages (when app is already open)
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data && event.data.type === 'OPEN_TASK' && event.data.taskId) {
+        const taskId = event.data.taskId;
+        const taskToOpen = projects.find(p => p.id === taskId);
+        if (taskToOpen) {
+          setSelectedProject(taskToOpen);
+        } else {
+          // Task might be in a different department, set pending to fetch
+          setPendingTaskId(taskId);
+          // Refresh projects to get latest data
+          fetchProjects();
+        }
+      }
+    };
+
+    navigator.serviceWorker?.addEventListener('message', handleMessage);
+    return () => {
+      navigator.serviceWorker?.removeEventListener('message', handleMessage);
+    };
+  }, [projects, fetchProjects]);
 
   const handleDragStart = (e: React.DragEvent, project: Project) => {
     setDraggedProject(project);
@@ -229,9 +293,50 @@ export default function KanbanBoard({ token, departments, userId, userName, isSu
     fetchProjects();
   };
 
-  const handleTaskUpdated = () => {
-    setSelectedProject(null);
-    fetchProjects();
+  const handleTaskUpdated = async (keepModalOpen = false) => {
+    // Fetch updated projects
+    try {
+      let url = '/api/projects';
+      const params = new URLSearchParams();
+
+      if (selectedDepartment !== 'all') {
+        params.append('departmentId', selectedDepartment);
+      }
+
+      if (viewMode === 'assigned') {
+        params.append('assignedToMe', 'true');
+      }
+
+      if (params.toString()) {
+        url += '?' + params.toString();
+      }
+
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success) {
+        setProjects(data.data);
+
+        // If keeping modal open, update the selected project with fresh data
+        if (keepModalOpen && selectedProject) {
+          const updatedProject = data.data.find((p: Project) => p.id === selectedProject.id);
+          if (updatedProject) {
+            setSelectedProject(updatedProject);
+          } else {
+            // Project was deleted or moved out of view
+            setSelectedProject(null);
+          }
+        } else {
+          setSelectedProject(null);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching projects:', err);
+      if (!keepModalOpen) {
+        setSelectedProject(null);
+      }
+    }
   };
 
   // Filter projects based on search, priority, and due date

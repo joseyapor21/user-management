@@ -50,18 +50,27 @@ self.addEventListener('notificationclick', function(event) {
     return;
   }
 
-  // Open or focus the dashboard
+  const taskId = event.notification.data.taskId;
+  const baseUrl = event.notification.data.url || '/dashboard';
+  // Add taskId as URL parameter so the app can open the task modal
+  const targetUrl = taskId ? baseUrl + '?openTask=' + taskId : baseUrl;
+
+  // Open or focus the dashboard and navigate to the task
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
       // Check if there's already an open window
       for (const client of clientList) {
         if (client.url.includes('/dashboard') && 'focus' in client) {
+          // Post a message to the client to open the task
+          if (taskId) {
+            client.postMessage({ type: 'OPEN_TASK', taskId: taskId });
+          }
           return client.focus();
         }
       }
-      // Otherwise open a new window
+      // Otherwise open a new window with the task parameter
       if (clients.openWindow) {
-        return clients.openWindow(event.notification.data.url);
+        return clients.openWindow(targetUrl);
       }
     })
   );
