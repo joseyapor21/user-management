@@ -360,7 +360,7 @@ export default function TaskModal({
         setNewComment('');
         // Reset textarea height
         if (commentInputRef.current) {
-          commentInputRef.current.style.height = '44px';
+          commentInputRef.current.style.height = '36px';
         }
         onUpdate(true); // Keep modal open after adding comment
       }
@@ -1341,86 +1341,89 @@ export default function TaskModal({
               )}
 
               {activeTab === 'comments' && (
-                <div className="space-y-4">
-                  {/* Comment List */}
-                  <div className="space-y-3 max-h-60 overflow-y-auto">
+                <div className="flex flex-col -mx-4 -mb-4" style={{ height: '350px' }}>
+                  {/* Messages List - iPhone style */}
+                  <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1 bg-gray-50">
                     {project.comments.length === 0 ? (
-                      <p className="text-sm text-gray-400 text-center py-4">No comments yet</p>
+                      <p className="text-sm text-gray-400 text-center py-8">No messages yet</p>
                     ) : (
-                      project.comments.map((comment) => (
-                        <div key={comment.id} className="bg-gray-50 rounded-lg p-3">
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-sm font-medium text-gray-800">{comment.userName}</span>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-gray-400">{formatDate(comment.createdAt)}</span>
-                              {(comment.userId === userId || isSuperUser) && (
-                                <button
-                                  onClick={() => handleDeleteComment(comment.id)}
-                                  className="text-red-500 hover:text-red-700 text-xs"
-                                >
-                                  Delete
-                                </button>
+                      project.comments.map((comment) => {
+                        const isOwn = comment.userId === userId;
+                        return (
+                          <div key={comment.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
+                            <div className={`max-w-[80%] ${isOwn ? 'order-2' : ''}`}>
+                              {!isOwn && (
+                                <span className="text-xs text-gray-500 ml-3 mb-0.5 block">{comment.userName}</span>
                               )}
+                              <div
+                                className={`px-3 py-2 rounded-2xl ${
+                                  isOwn
+                                    ? 'bg-blue-500 text-white rounded-br-md'
+                                    : 'bg-white text-gray-900 rounded-bl-md shadow-sm'
+                                }`}
+                              >
+                                <p className="text-[15px] whitespace-pre-wrap break-words" style={{ fontSize: '15px' }}>{comment.text}</p>
+                              </div>
+                              <div className={`flex items-center gap-2 mt-0.5 ${isOwn ? 'justify-end mr-1' : 'ml-3'}`}>
+                                <span className="text-[10px] text-gray-400">
+                                  {new Date(comment.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                                {(comment.userId === userId || isSuperUser) && (
+                                  <button
+                                    onClick={() => handleDeleteComment(comment.id)}
+                                    className="text-[10px] text-red-400 hover:text-red-600"
+                                  >
+                                    Delete
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           </div>
-                          <p className="text-sm text-gray-600 whitespace-pre-wrap">{comment.text}</p>
-                        </div>
-                      ))
+                        );
+                      })
                     )}
                   </div>
 
-                  {/* Add Comment Input */}
-                  <div className="pt-4 border-t">
-                    <div className="flex gap-2 items-end">
-                      <div className="flex-1 relative">
-                        <textarea
-                          ref={commentInputRef}
-                          value={newComment}
-                          onChange={(e) => {
-                            setNewComment(e.target.value);
-                            // Auto-resize textarea
-                            e.target.style.height = 'auto';
-                            e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
-                          }}
-                          placeholder="Write a comment..."
-                          rows={1}
-                          autoComplete="off"
-                          autoCorrect="on"
-                          spellCheck={true}
-                          className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-base bg-white text-gray-900 resize-none overflow-hidden focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                          style={{ minHeight: '44px', maxHeight: '120px', fontSize: '16px' }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                              e.preventDefault();
-                              handleAddComment();
-                            }
-                          }}
-                          onFocus={(e) => {
-                            // Scroll input into view on mobile
-                            setTimeout(() => {
-                              e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                            }, 300);
-                          }}
-                        />
-                      </div>
-                      <button
-                        onClick={handleAddComment}
-                        disabled={addingComment || !newComment.trim()}
-                        className="px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0"
-                      >
-                        {addingComment ? (
-                          <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                        ) : (
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                          </svg>
-                        )}
-                      </button>
-                    </div>
-                    <p className="text-xs text-gray-400 mt-1.5">Press Enter to send, Shift+Enter for new line</p>
+                  {/* Input Bar - Fixed at bottom */}
+                  <div className="shrink-0 bg-white border-t px-2 py-2 flex gap-2 items-end">
+                    <textarea
+                      ref={commentInputRef}
+                      value={newComment}
+                      onChange={(e) => {
+                        setNewComment(e.target.value);
+                        e.target.style.height = 'auto';
+                        e.target.style.height = Math.min(e.target.scrollHeight, 100) + 'px';
+                      }}
+                      placeholder="Message"
+                      rows={1}
+                      autoComplete="off"
+                      autoCorrect="on"
+                      spellCheck={true}
+                      className="flex-1 px-4 py-2 bg-gray-100 rounded-full text-gray-900 resize-none overflow-hidden focus:outline-none focus:bg-gray-200 transition-colors"
+                      style={{ minHeight: '36px', maxHeight: '100px', fontSize: '16px' }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleAddComment();
+                        }
+                      }}
+                    />
+                    <button
+                      onClick={handleAddComment}
+                      disabled={addingComment || !newComment.trim()}
+                      className="w-9 h-9 flex items-center justify-center bg-blue-500 text-white rounded-full disabled:opacity-40 disabled:cursor-not-allowed transition-opacity shrink-0"
+                    >
+                      {addingComment ? (
+                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                      ) : (
+                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+                        </svg>
+                      )}
+                    </button>
                   </div>
                 </div>
               )}
