@@ -58,7 +58,7 @@ export default function TaskModal({
   const [newComment, setNewComment] = useState('');
   const [addingComment, setAddingComment] = useState(false);
   const [members, setMembers] = useState<User[]>([]);
-  const [activeTab, setActiveTab] = useState<'details' | 'subtasks' | 'attachments' | 'dependencies' | 'activity'>('details');
+  const [activeTab, setActiveTab] = useState<'details' | 'subtasks' | 'attachments' | 'dependencies' | 'activity' | 'comments'>('details');
   const [newLabelName, setNewLabelName] = useState('');
   const [newLabelColor, setNewLabelColor] = useState<LabelColor>('blue');
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
@@ -947,6 +947,16 @@ export default function TaskModal({
                   >
                     Activity ({project.activityLog?.length || 0})
                   </button>
+                  <button
+                    onClick={() => setActiveTab('comments')}
+                    className={`pb-2 px-1 text-sm font-medium border-b-2 transition-colors ${
+                      activeTab === 'comments'
+                        ? 'border-blue-500 text-blue-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    Comments ({project.comments?.length || 0})
+                  </button>
                 </nav>
               </div>
 
@@ -1324,68 +1334,65 @@ export default function TaskModal({
                   )}
                 </div>
               )}
+
+              {activeTab === 'comments' && (
+                <div className="space-y-4">
+                  {/* Comment List */}
+                  <div className="space-y-3 max-h-60 overflow-y-auto">
+                    {project.comments.length === 0 ? (
+                      <p className="text-sm text-gray-400 text-center py-4">No comments yet</p>
+                    ) : (
+                      project.comments.map((comment) => (
+                        <div key={comment.id} className="bg-gray-50 rounded-lg p-3">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-sm font-medium text-gray-800">{comment.userName}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-gray-400">{formatDate(comment.createdAt)}</span>
+                              {(comment.userId === userId || isSuperUser) && (
+                                <button
+                                  onClick={() => handleDeleteComment(comment.id)}
+                                  className="text-red-500 hover:text-red-700 text-xs"
+                                >
+                                  Delete
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                          <p className="text-sm text-gray-600 whitespace-pre-wrap">{comment.text}</p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  {/* Add Comment Input */}
+                  <div className="pt-4 border-t">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newComment}
+                        onChange={(e) => setNewComment(e.target.value)}
+                        placeholder="Add a comment..."
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm bg-white text-gray-900"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            handleAddComment();
+                          }
+                        }}
+                      />
+                      <button
+                        onClick={handleAddComment}
+                        disabled={addingComment || !newComment.trim()}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-50"
+                      >
+                        {addingComment ? '...' : 'Send'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </>
           )}
-
-          {/* Comments Section - Comment List Only */}
-          <div className="pt-4 border-t">
-            <h4 className="text-sm font-medium text-gray-700 mb-3">
-              Comments ({project.comments.length})
-            </h4>
-
-            {/* Comment List */}
-            <div className="space-y-3 max-h-48 overflow-y-auto">
-              {project.comments.length === 0 ? (
-                <p className="text-sm text-gray-400">No comments yet</p>
-              ) : (
-                project.comments.map((comment) => (
-                  <div key={comment.id} className="bg-gray-50 rounded-lg p-3">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-medium text-gray-800">{comment.userName}</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-400">{formatDate(comment.createdAt)}</span>
-                        {(comment.userId === userId || isSuperUser) && (
-                          <button
-                            onClick={() => handleDeleteComment(comment.id)}
-                            className="text-red-500 hover:text-red-700 text-xs"
-                          >
-                            Delete
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                    <p className="text-sm text-gray-600">{comment.text}</p>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Comment Input - Sticky at bottom on mobile */}
-        <div className="shrink-0 bg-white border-t p-4 md:relative" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={newComment}
-              onChange={(e) => setNewComment(e.target.value)}
-              placeholder="Add a comment..."
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm bg-white text-gray-900"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleAddComment();
-                }
-              }}
-            />
-            <button
-              onClick={handleAddComment}
-              disabled={addingComment || !newComment.trim()}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-50"
-            >
-              {addingComment ? '...' : 'Add'}
-            </button>
-          </div>
         </div>
 
         {/* Footer */}
