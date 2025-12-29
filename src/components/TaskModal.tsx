@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Project, Department, Priority, ProjectStatus, User, Label, LabelColor, Subtask } from '@/types';
 import { useNotifications } from '@/hooks/useNotifications';
 
@@ -57,6 +57,7 @@ export default function TaskModal({
   const [deleting, setDeleting] = useState(false);
   const [newComment, setNewComment] = useState('');
   const [addingComment, setAddingComment] = useState(false);
+  const commentInputRef = useRef<HTMLTextAreaElement>(null);
   const [members, setMembers] = useState<User[]>([]);
   const [activeTab, setActiveTab] = useState<'details' | 'subtasks' | 'attachments' | 'dependencies' | 'activity' | 'comments'>('details');
   const [newLabelName, setNewLabelName] = useState('');
@@ -357,6 +358,10 @@ export default function TaskModal({
         });
 
         setNewComment('');
+        // Reset textarea height
+        if (commentInputRef.current) {
+          commentInputRef.current.style.height = '42px';
+        }
         onUpdate(true); // Keep modal open after adding comment
       }
     } catch {
@@ -1366,28 +1371,56 @@ export default function TaskModal({
 
                   {/* Add Comment Input */}
                   <div className="pt-4 border-t">
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={newComment}
-                        onChange={(e) => setNewComment(e.target.value)}
-                        placeholder="Add a comment..."
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm bg-white text-gray-900"
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault();
-                            handleAddComment();
-                          }
-                        }}
-                      />
+                    <div className="flex gap-2 items-end">
+                      <div className="flex-1 relative">
+                        <textarea
+                          ref={commentInputRef}
+                          value={newComment}
+                          onChange={(e) => {
+                            setNewComment(e.target.value);
+                            // Auto-resize textarea
+                            e.target.style.height = 'auto';
+                            e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+                          }}
+                          placeholder="Write a comment..."
+                          rows={1}
+                          autoComplete="off"
+                          autoCorrect="on"
+                          spellCheck={true}
+                          className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm bg-white text-gray-900 resize-none overflow-hidden focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                          style={{ minHeight: '42px', maxHeight: '120px' }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              e.preventDefault();
+                              handleAddComment();
+                            }
+                          }}
+                          onFocus={(e) => {
+                            // Scroll input into view on mobile
+                            setTimeout(() => {
+                              e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            }, 300);
+                          }}
+                        />
+                      </div>
                       <button
                         onClick={handleAddComment}
                         disabled={addingComment || !newComment.trim()}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-50"
+                        className="px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0"
                       >
-                        {addingComment ? '...' : 'Send'}
+                        {addingComment ? (
+                          <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                        ) : (
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                          </svg>
+                        )}
                       </button>
                     </div>
+                    <p className="text-xs text-gray-400 mt-1.5">Press Enter to send, Shift+Enter for new line</p>
                   </div>
                 </div>
               )}
