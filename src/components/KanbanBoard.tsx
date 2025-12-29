@@ -92,6 +92,64 @@ export default function KanbanBoard({ token, departments, userId, userName, isSu
     fetchProjects();
   }, [fetchProjects]);
 
+  // Poll for updates every 10 seconds (only when tab is visible)
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout | null = null;
+
+    const startPolling = () => {
+      if (intervalId) return;
+      intervalId = setInterval(() => {
+        // Silent fetch - don't show loading state
+        fetch('/api/projects' + (selectedDepartment !== 'all' ? `?departmentId=${selectedDepartment}` : '') + (viewMode === 'assigned' ? `${selectedDepartment !== 'all' ? '&' : '?'}assignedToMe=true` : ''), {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+          .then(res => res.json())
+          .then(data => {
+            if (data.success) {
+              setProjects(data.data);
+              // Update selected project if it's open
+              if (selectedProject) {
+                const updated = data.data.find((p: Project) => p.id === selectedProject.id);
+                if (updated) {
+                  setSelectedProject(updated);
+                }
+              }
+            }
+          })
+          .catch(() => {}); // Silent fail for polling
+      }, 10000); // 10 seconds
+    };
+
+    const stopPolling = () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+        intervalId = null;
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        stopPolling();
+      } else {
+        // Fetch immediately when tab becomes visible, then start polling
+        fetchProjects();
+        startPolling();
+      }
+    };
+
+    // Start polling if tab is visible
+    if (!document.hidden) {
+      startPolling();
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      stopPolling();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [token, selectedDepartment, viewMode, selectedProject, fetchProjects]);
+
   // Fetch custom columns when department changes
   const fetchColumns = useCallback(async (deptId: string) => {
     if (deptId === 'all') {
