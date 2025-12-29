@@ -360,7 +360,7 @@ export default function TaskModal({
         setNewComment('');
         // Reset textarea height
         if (commentInputRef.current) {
-          commentInputRef.current.style.height = '42px';
+          commentInputRef.current.style.height = '44px';
         }
         onUpdate(true); // Keep modal open after adding comment
       }
@@ -1387,8 +1387,8 @@ export default function TaskModal({
                           autoComplete="off"
                           autoCorrect="on"
                           spellCheck={true}
-                          className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm bg-white text-gray-900 resize-none overflow-hidden focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                          style={{ minHeight: '42px', maxHeight: '120px' }}
+                          className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-base bg-white text-gray-900 resize-none overflow-hidden focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                          style={{ minHeight: '44px', maxHeight: '120px', fontSize: '16px' }}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter' && !e.shiftKey) {
                               e.preventDefault();
