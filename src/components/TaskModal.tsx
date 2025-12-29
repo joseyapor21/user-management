@@ -11,6 +11,7 @@ interface TaskModalProps {
   userName: string;
   isSuperUser: boolean;
   departments: Department[];
+  initialTab?: string | null;
   onClose: () => void;
   onUpdate: (keepModalOpen?: boolean) => void;
   onDelete: () => void;
@@ -41,6 +42,8 @@ const labelColorOptions: { value: LabelColor; bg: string; label: string }[] = [
   { value: 'gray', bg: 'bg-gray-500', label: 'Gray' },
 ];
 
+type TabType = 'details' | 'subtasks' | 'attachments' | 'dependencies' | 'activity' | 'comments';
+
 export default function TaskModal({
   project,
   token,
@@ -48,6 +51,7 @@ export default function TaskModal({
   userName,
   isSuperUser,
   departments,
+  initialTab,
   onClose,
   onUpdate,
   onDelete,
@@ -60,7 +64,13 @@ export default function TaskModal({
   const commentInputRef = useRef<HTMLTextAreaElement>(null);
   const commentsListRef = useRef<HTMLDivElement>(null);
   const [members, setMembers] = useState<User[]>([]);
-  const [activeTab, setActiveTab] = useState<'details' | 'subtasks' | 'attachments' | 'dependencies' | 'activity' | 'comments'>('details');
+  const [activeTab, setActiveTab] = useState<TabType>(() => {
+    const validTabs: TabType[] = ['details', 'subtasks', 'attachments', 'dependencies', 'activity', 'comments'];
+    if (initialTab && validTabs.includes(initialTab as TabType)) {
+      return initialTab as TabType;
+    }
+    return 'details';
+  });
   const [newLabelName, setNewLabelName] = useState('');
   const [newLabelColor, setNewLabelColor] = useState<LabelColor>('blue');
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
@@ -357,6 +367,7 @@ export default function TaskModal({
                 body: `"${project.title}": ${commentPreview}`,
                 url: `/dashboard`,
                 taskId: project.id,
+                tab: 'comments',
                 department: project.departmentName,
                 priority: project.priority,
                 byUser: userName,
@@ -1349,9 +1360,9 @@ export default function TaskModal({
               )}
 
               {activeTab === 'comments' && (
-                <div className="space-y-2">
+                <div className="flex flex-col flex-1 -mb-4 md:mb-0">
                   {/* Messages List - iPhone style */}
-                  <div ref={commentsListRef} className="space-y-1 max-h-64 overflow-y-auto bg-gray-50 -mx-4 px-3 py-2">
+                  <div ref={commentsListRef} className="flex-1 space-y-1 overflow-y-auto bg-gray-50 -mx-4 px-3 py-2 min-h-[120px] md:max-h-64">
                     {project.comments.length === 0 ? (
                       <p className="text-sm text-gray-400 text-center py-4">No messages yet</p>
                     ) : (
@@ -1393,7 +1404,7 @@ export default function TaskModal({
                   </div>
 
                   {/* Message Input */}
-                  <div className="flex gap-2 items-end">
+                  <div className="flex gap-2 items-end bg-white -mx-4 px-4 py-2 md:mx-0 md:px-0 md:py-0 md:bg-transparent">
                     <textarea
                       ref={commentInputRef}
                       value={newComment}
@@ -1405,8 +1416,10 @@ export default function TaskModal({
                       placeholder="Message"
                       rows={1}
                       autoComplete="off"
-                      autoCorrect="on"
-                      spellCheck={true}
+                      autoCorrect="off"
+                      autoCapitalize="sentences"
+                      spellCheck={false}
+                      enterKeyHint="send"
                       className="flex-1 px-4 py-2 bg-gray-100 rounded-full text-gray-900 resize-none overflow-hidden focus:outline-none focus:bg-gray-200 transition-colors"
                       style={{ minHeight: '36px', maxHeight: '100px', fontSize: '16px' }}
                       onKeyDown={(e) => {
@@ -1439,8 +1452,8 @@ export default function TaskModal({
           )}
         </div>
 
-        {/* Footer */}
-        <div className="p-4 border-t flex justify-between">
+        {/* Footer - hide on mobile when in comments tab */}
+        <div className={`p-4 border-t flex justify-between ${activeTab === 'comments' ? 'hidden md:flex' : ''}`}>
           <div>
             {canEdit && (
               <button

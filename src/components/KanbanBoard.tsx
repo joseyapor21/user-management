@@ -52,6 +52,7 @@ export default function KanbanBoard({ token, departments, userId, userName, isSu
   const [showTemplateSelector, setShowTemplateSelector] = useState(false);
   const [showDraftsModal, setShowDraftsModal] = useState(false);
   const [pendingTaskId, setPendingTaskId] = useState<string | null>(null);
+  const [initialModalTab, setInitialModalTab] = useState<string | null>(null);
   const { showToast, showError } = useNotifications();
 
   // Check if user can manage tasks (is admin of any department or superuser)
@@ -179,7 +180,12 @@ export default function KanbanBoard({ token, departments, userId, userName, isSu
   // Check URL for openTask parameter (from push notification click)
   useEffect(() => {
     const openTaskId = searchParams.get('openTask');
+    const openTab = searchParams.get('tab');
     if (openTaskId && token) {
+      // Set the initial tab if specified
+      if (openTab) {
+        setInitialModalTab(openTab);
+      }
       // Fetch and open the task immediately
       fetch(`/api/projects?id=${openTaskId}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -955,7 +961,8 @@ export default function KanbanBoard({ token, departments, userId, userName, isSu
           userName={userName}
           isSuperUser={isSuperUser}
           departments={departments}
-          onClose={() => setSelectedProject(null)}
+          initialTab={initialModalTab}
+          onClose={() => { setSelectedProject(null); setInitialModalTab(null); }}
           onUpdate={handleTaskUpdated}
           onDelete={handleTaskUpdated}
         />

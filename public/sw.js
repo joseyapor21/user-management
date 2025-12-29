@@ -31,7 +31,8 @@ self.addEventListener('push', function(event) {
     vibrate: [200, 100, 200],
     data: {
       url: data.url || '/dashboard',
-      taskId: data.taskId
+      taskId: data.taskId,
+      tab: data.tab
     },
     actions: [
       { action: 'view', title: 'View Task' },
@@ -52,9 +53,16 @@ self.addEventListener('notificationclick', function(event) {
   }
 
   const taskId = event.notification.data?.taskId;
+  const tab = event.notification.data?.tab;
   const baseUrl = event.notification.data?.url || '/dashboard';
-  // Add taskId as URL parameter so the app can open the task modal
-  const targetUrl = taskId ? baseUrl + '?openTask=' + taskId : baseUrl;
+  // Add taskId and tab as URL parameters so the app can open the task modal
+  let targetUrl = baseUrl;
+  if (taskId) {
+    targetUrl += '?openTask=' + taskId;
+    if (tab) {
+      targetUrl += '&tab=' + tab;
+    }
+  }
 
   // Open or focus the dashboard and navigate to the task
   event.waitUntil(

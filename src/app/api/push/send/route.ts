@@ -81,6 +81,7 @@ export async function POST(request: NextRequest) {
       tag: notification.tag || `notification-${Date.now()}`,
       // Include task-related data for deep linking
       taskId: notification.taskId || null,
+      tab: notification.tab || null,
       department: notification.department || null,
       priority: notification.priority || null,
       dueDate: notification.dueDate || null,
