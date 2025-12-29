@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { User, Department } from '@/types';
 import DepartmentCard from '@/components/DepartmentCard';
@@ -434,6 +435,15 @@ export default function DashboardPage() {
           {/* Desktop navigation */}
           <div className="hidden md:flex items-center gap-4">
             <NotificationBell token={token || ''} />
+            <Link
+              href="/help"
+              className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Help"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </Link>
             <span className="text-sm text-gray-600">
               {user.name || user.email} {user.isSuperUser && <span className="text-blue-600">(SuperUser)</span>}
             </span>
@@ -477,6 +487,16 @@ export default function DashboardPage() {
               {user.isSuperUser && <span className="ml-2 text-blue-600">(SuperUser)</span>}
             </div>
             <div className="flex flex-col gap-2">
+              <Link
+                href="/help"
+                onClick={() => setShowMobileMenu(false)}
+                className="text-left text-sm text-gray-600 hover:text-blue-600 py-1 flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Help & Guide
+              </Link>
               <button
                 onClick={() => { openProfileModal(); setShowMobileMenu(false); }}
                 className="text-left text-sm text-blue-600 hover:text-blue-800 py-1"
