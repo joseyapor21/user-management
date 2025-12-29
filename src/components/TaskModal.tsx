@@ -1347,7 +1347,7 @@ export default function TaskModal({
                     {project.comments.length === 0 ? (
                       <p className="text-sm text-gray-400 text-center py-4">No messages yet</p>
                     ) : (
-                      [...project.comments].map((comment) => {
+                      [...project.comments].reverse().map((comment) => {
                         const isOwn = comment.userId === userId;
                         return (
                           <div key={comment.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
