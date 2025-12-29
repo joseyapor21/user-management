@@ -1341,9 +1341,9 @@ export default function TaskModal({
               )}
 
               {activeTab === 'comments' && (
-                <div className="flex flex-col -mx-4 -mb-4" style={{ height: '350px' }}>
+                <div className="flex flex-col -mx-4 -mb-4 h-[400px]">
                   {/* Messages List - iPhone style */}
-                  <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1 bg-gray-50">
+                  <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1 bg-gray-50 overscroll-contain">
                     {project.comments.length === 0 ? (
                       <p className="text-sm text-gray-400 text-center py-8">No messages yet</p>
                     ) : (
@@ -1431,8 +1431,8 @@ export default function TaskModal({
           )}
         </div>
 
-        {/* Footer */}
-        <div className="p-4 border-t flex justify-between">
+        {/* Footer - Hide when in comments tab */}
+        <div className={`p-4 border-t flex justify-between ${activeTab === 'comments' ? 'hidden' : ''}`}>
           <div>
             {canEdit && (
               <button
