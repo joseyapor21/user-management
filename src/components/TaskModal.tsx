@@ -1384,46 +1384,82 @@ export default function TaskModal({
                     )}
                   </div>
 
-                  {/* Input Bar - Fixed at bottom */}
-                  <div className="shrink-0 bg-white border-t px-2 py-1.5 flex gap-2 items-end" style={{ paddingBottom: 'max(6px, env(safe-area-inset-bottom))' }}>
-                    <textarea
-                      ref={commentInputRef}
-                      value={newComment}
-                      onChange={(e) => {
-                        setNewComment(e.target.value);
-                        e.target.style.height = 'auto';
-                        e.target.style.height = Math.min(e.target.scrollHeight, 100) + 'px';
-                      }}
-                      placeholder="Message"
-                      rows={1}
-                      autoComplete="off"
-                      autoCorrect="on"
-                      spellCheck={true}
-                      className="flex-1 px-4 py-2 bg-gray-100 rounded-full text-gray-900 resize-none overflow-hidden focus:outline-none focus:bg-gray-200 transition-colors"
-                      style={{ minHeight: '36px', maxHeight: '100px', fontSize: '16px' }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                          e.preventDefault();
-                          handleAddComment();
-                        }
-                      }}
-                    />
-                    <button
-                      onClick={handleAddComment}
-                      disabled={addingComment || !newComment.trim()}
-                      className="w-9 h-9 flex items-center justify-center bg-blue-500 text-white rounded-full disabled:opacity-40 disabled:cursor-not-allowed transition-opacity shrink-0"
-                    >
-                      {addingComment ? (
-                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                      ) : (
-                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
-                        </svg>
-                      )}
-                    </button>
+                  {/* Input Bar and Actions - Fixed at bottom */}
+                  <div className="shrink-0 bg-white border-t" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+                    {/* Message Input */}
+                    <div className="px-2 py-1.5 flex gap-2 items-end">
+                      <textarea
+                        ref={commentInputRef}
+                        value={newComment}
+                        onChange={(e) => {
+                          setNewComment(e.target.value);
+                          e.target.style.height = 'auto';
+                          e.target.style.height = Math.min(e.target.scrollHeight, 100) + 'px';
+                        }}
+                        placeholder="Message"
+                        rows={1}
+                        autoComplete="off"
+                        autoCorrect="on"
+                        spellCheck={true}
+                        className="flex-1 px-4 py-2 bg-gray-100 rounded-full text-gray-900 resize-none overflow-hidden focus:outline-none focus:bg-gray-200 transition-colors"
+                        style={{ minHeight: '36px', maxHeight: '100px', fontSize: '16px' }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            handleAddComment();
+                          }
+                        }}
+                      />
+                      <button
+                        onClick={handleAddComment}
+                        disabled={addingComment || !newComment.trim()}
+                        className="w-9 h-9 flex items-center justify-center bg-blue-500 text-white rounded-full disabled:opacity-40 disabled:cursor-not-allowed transition-opacity shrink-0"
+                      >
+                        {addingComment ? (
+                          <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                        ) : (
+                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                    {/* Action Buttons */}
+                    <div className="px-3 py-2 flex justify-between border-t border-gray-100">
+                      <div>
+                        {canEdit && (
+                          <button
+                            onClick={handleDelete}
+                            disabled={deleting}
+                            className="px-3 py-1.5 text-orange-600 text-sm font-medium"
+                          >
+                            {deleting ? 'Moving...' : 'Drafts'}
+                          </button>
+                        )}
+                      </div>
+                      <div className="flex gap-3">
+                        <button
+                          onClick={onClose}
+                          className="px-3 py-1.5 text-gray-600 text-sm font-medium"
+                        >
+                          Close
+                        </button>
+                        {canEdit && !isEditing && (
+                          <button
+                            onClick={() => {
+                              setActiveTab('details');
+                              setIsEditing(true);
+                            }}
+                            className="px-3 py-1.5 text-blue-600 text-sm font-medium"
+                          >
+                            Edit
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
