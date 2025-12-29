@@ -1341,17 +1341,17 @@ export default function TaskModal({
               )}
 
               {activeTab === 'comments' && (
-                <div className="flex flex-col -mx-4 -mt-4 absolute inset-0 top-[140px]">
-                  {/* Messages List - iPhone style, newest at bottom */}
-                  <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1 bg-gray-50 overscroll-contain flex flex-col justify-end">
+                <div className="space-y-2">
+                  {/* Messages List - iPhone style */}
+                  <div className="space-y-1 max-h-64 overflow-y-auto bg-gray-50 -mx-4 px-3 py-2">
                     {project.comments.length === 0 ? (
-                      <p className="text-sm text-gray-400 text-center py-8">No messages yet</p>
+                      <p className="text-sm text-gray-400 text-center py-4">No messages yet</p>
                     ) : (
                       [...project.comments].map((comment) => {
                         const isOwn = comment.userId === userId;
                         return (
                           <div key={comment.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
-                            <div className={`max-w-[80%] ${isOwn ? 'order-2' : ''}`}>
+                            <div className="max-w-[80%]">
                               {!isOwn && (
                                 <span className="text-xs text-gray-500 ml-3 mb-0.5 block">{comment.userName}</span>
                               )}
@@ -1362,7 +1362,7 @@ export default function TaskModal({
                                     : 'bg-white text-gray-900 rounded-bl-md shadow-sm'
                                 }`}
                               >
-                                <p className="text-[15px] whitespace-pre-wrap break-words" style={{ fontSize: '15px' }}>{comment.text}</p>
+                                <p className="text-[15px] whitespace-pre-wrap break-words">{comment.text}</p>
                               </div>
                               <div className={`flex items-center gap-2 mt-0.5 ${isOwn ? 'justify-end mr-1' : 'ml-3'}`}>
                                 <span className="text-[10px] text-gray-400">
@@ -1384,82 +1384,46 @@ export default function TaskModal({
                     )}
                   </div>
 
-                  {/* Input Bar and Actions - Fixed at bottom */}
-                  <div className="shrink-0 bg-white border-t" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-                    {/* Message Input */}
-                    <div className="px-2 py-1.5 flex gap-2 items-end">
-                      <textarea
-                        ref={commentInputRef}
-                        value={newComment}
-                        onChange={(e) => {
-                          setNewComment(e.target.value);
-                          e.target.style.height = 'auto';
-                          e.target.style.height = Math.min(e.target.scrollHeight, 100) + 'px';
-                        }}
-                        placeholder="Message"
-                        rows={1}
-                        autoComplete="off"
-                        autoCorrect="on"
-                        spellCheck={true}
-                        className="flex-1 px-4 py-2 bg-gray-100 rounded-full text-gray-900 resize-none overflow-hidden focus:outline-none focus:bg-gray-200 transition-colors"
-                        style={{ minHeight: '36px', maxHeight: '100px', fontSize: '16px' }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault();
-                            handleAddComment();
-                          }
-                        }}
-                      />
-                      <button
-                        onClick={handleAddComment}
-                        disabled={addingComment || !newComment.trim()}
-                        className="w-9 h-9 flex items-center justify-center bg-blue-500 text-white rounded-full disabled:opacity-40 disabled:cursor-not-allowed transition-opacity shrink-0"
-                      >
-                        {addingComment ? (
-                          <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                        ) : (
-                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
-                          </svg>
-                        )}
-                      </button>
-                    </div>
-                    {/* Action Buttons */}
-                    <div className="px-3 py-2 flex justify-between border-t border-gray-100">
-                      <div>
-                        {canEdit && (
-                          <button
-                            onClick={handleDelete}
-                            disabled={deleting}
-                            className="px-3 py-1.5 text-orange-600 text-sm font-medium"
-                          >
-                            {deleting ? 'Moving...' : 'Drafts'}
-                          </button>
-                        )}
-                      </div>
-                      <div className="flex gap-3">
-                        <button
-                          onClick={onClose}
-                          className="px-3 py-1.5 text-gray-600 text-sm font-medium"
-                        >
-                          Close
-                        </button>
-                        {canEdit && !isEditing && (
-                          <button
-                            onClick={() => {
-                              setActiveTab('details');
-                              setIsEditing(true);
-                            }}
-                            className="px-3 py-1.5 text-blue-600 text-sm font-medium"
-                          >
-                            Edit
-                          </button>
-                        )}
-                      </div>
-                    </div>
+                  {/* Message Input */}
+                  <div className="flex gap-2 items-end">
+                    <textarea
+                      ref={commentInputRef}
+                      value={newComment}
+                      onChange={(e) => {
+                        setNewComment(e.target.value);
+                        e.target.style.height = 'auto';
+                        e.target.style.height = Math.min(e.target.scrollHeight, 100) + 'px';
+                      }}
+                      placeholder="Message"
+                      rows={1}
+                      autoComplete="off"
+                      autoCorrect="on"
+                      spellCheck={true}
+                      className="flex-1 px-4 py-2 bg-gray-100 rounded-full text-gray-900 resize-none overflow-hidden focus:outline-none focus:bg-gray-200 transition-colors"
+                      style={{ minHeight: '36px', maxHeight: '100px', fontSize: '16px' }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleAddComment();
+                        }
+                      }}
+                    />
+                    <button
+                      onClick={handleAddComment}
+                      disabled={addingComment || !newComment.trim()}
+                      className="w-9 h-9 flex items-center justify-center bg-blue-500 text-white rounded-full disabled:opacity-40 disabled:cursor-not-allowed transition-opacity shrink-0"
+                    >
+                      {addingComment ? (
+                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                      ) : (
+                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+                        </svg>
+                      )}
+                    </button>
                   </div>
                 </div>
               )}
@@ -1467,8 +1431,8 @@ export default function TaskModal({
           )}
         </div>
 
-        {/* Footer - Hide when in comments tab */}
-        <div className={`p-4 border-t flex justify-between ${activeTab === 'comments' ? 'hidden' : ''}`}>
+        {/* Footer */}
+        <div className="p-4 border-t flex justify-between">
           <div>
             {canEdit && (
               <button
