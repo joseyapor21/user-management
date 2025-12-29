@@ -79,6 +79,12 @@ export async function POST(request: NextRequest) {
       body: notification.body || 'You have a new notification',
       url: notification.url || '/dashboard',
       tag: notification.tag || `notification-${Date.now()}`,
+      // Include task-related data for deep linking
+      taskId: notification.taskId || null,
+      department: notification.department || null,
+      priority: notification.priority || null,
+      dueDate: notification.dueDate || null,
+      byUser: notification.byUser || null,
     });
 
     // Send to all subscriptions for this user
