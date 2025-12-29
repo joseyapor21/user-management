@@ -1341,13 +1341,13 @@ export default function TaskModal({
               )}
 
               {activeTab === 'comments' && (
-                <div className="flex flex-col -mx-4 -mb-4 h-[400px]">
-                  {/* Messages List - iPhone style */}
-                  <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1 bg-gray-50 overscroll-contain">
+                <div className="flex flex-col -mx-4 -mt-4 absolute inset-0 top-[140px]">
+                  {/* Messages List - iPhone style, newest at bottom */}
+                  <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1 bg-gray-50 overscroll-contain flex flex-col justify-end">
                     {project.comments.length === 0 ? (
                       <p className="text-sm text-gray-400 text-center py-8">No messages yet</p>
                     ) : (
-                      project.comments.map((comment) => {
+                      [...project.comments].map((comment) => {
                         const isOwn = comment.userId === userId;
                         return (
                           <div key={comment.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
@@ -1385,7 +1385,7 @@ export default function TaskModal({
                   </div>
 
                   {/* Input Bar - Fixed at bottom */}
-                  <div className="shrink-0 bg-white border-t px-2 py-2 flex gap-2 items-end">
+                  <div className="shrink-0 bg-white border-t px-2 py-1.5 flex gap-2 items-end" style={{ paddingBottom: 'max(6px, env(safe-area-inset-bottom))' }}>
                     <textarea
                       ref={commentInputRef}
                       value={newComment}
