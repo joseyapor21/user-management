@@ -67,7 +67,7 @@ async function getUserDepartments(userId: string, isSuperUser: boolean): Promise
   return departments.map(d => d._id.toString());
 }
 
-// GET - List projects (filtered by department access)
+// GET - List projects (filtered by department access) or get single project by ID
 export async function GET(request: NextRequest) {
   const userInfo = await getUserFromRequest(request);
   if (!userInfo) {
@@ -76,10 +76,49 @@ export async function GET(request: NextRequest) {
 
   try {
     const { searchParams } = new URL(request.url);
+    const projectId = searchParams.get('id');
     const departmentId = searchParams.get('departmentId');
     const assignedToMe = searchParams.get('assignedToMe') === 'true';
 
     const db = await getDatabase();
+
+    // If requesting a single project by ID
+    if (projectId) {
+      const project = await db.collection(COLLECTION_NAME).findOne({ _id: new ObjectId(projectId) });
+
+      if (!project) {
+        return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+      }
+
+      // Check if user has access to this project's department
+      const accessibleDepts = await getUserDepartments(userInfo.userId, userInfo.isSuperUser);
+      if (!accessibleDepts.includes(project.departmentId)) {
+        return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+      }
+
+      // Enrich with user and department names
+      const userIds = [project.assigneeId, project.createdBy, ...(project.assigneeIds || [])].filter(Boolean);
+      const users = await db.collection(USERS_COLLECTION)
+        .find({ _id: { $in: userIds.map(id => new ObjectId(id)) } })
+        .project({ _id: 1, name: 1, email: 1 })
+        .toArray();
+
+      const department = await db.collection(DEPARTMENTS_COLLECTION)
+        .findOne({ _id: new ObjectId(project.departmentId) });
+
+      const userMap = new Map(users.map(u => [u._id.toString(), u.name || u.email]));
+
+      const normalizedProject = {
+        ...project,
+        id: project._id.toString(),
+        assigneeName: project.assigneeId ? userMap.get(project.assigneeId) || 'Unknown' : null,
+        assigneeNames: (project.assigneeIds || []).map((id: string) => userMap.get(id) || 'Unknown'),
+        creatorName: userMap.get(project.createdBy) || 'Unknown',
+        departmentName: department?.name || 'Unknown',
+      };
+
+      return NextResponse.json({ success: true, data: normalizedProject });
+    }
 
     // Get user's accessible departments
     const accessibleDepts = await getUserDepartments(userInfo.userId, userInfo.isSuperUser);

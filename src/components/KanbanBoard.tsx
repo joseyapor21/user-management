@@ -128,12 +128,14 @@ export default function KanbanBoard({ token, departments, userId, userName, isSu
     }
   }, [searchParams, router]);
 
-  // Open task when projects are loaded and there's a pending task ID
+  // Open task when there's a pending task ID
   useEffect(() => {
-    if (pendingTaskId && projects.length > 0 && !loading) {
+    if (pendingTaskId && !loading) {
+      // First check if task is in current projects list
       const taskToOpen = projects.find(p => p.id === pendingTaskId);
       if (taskToOpen) {
         setSelectedProject(taskToOpen);
+        setPendingTaskId(null);
       } else {
         // Task might be in a different department, fetch it directly
         fetch(`/api/projects?id=${pendingTaskId}`, {
@@ -142,16 +144,12 @@ export default function KanbanBoard({ token, departments, userId, userName, isSu
           .then(res => res.json())
           .then(data => {
             if (data.success && data.data) {
-              // If it's a single project, set it
-              const project = Array.isArray(data.data) ? data.data[0] : data.data;
-              if (project) {
-                setSelectedProject(project);
-              }
+              setSelectedProject(data.data);
             }
           })
-          .catch(console.error);
+          .catch(console.error)
+          .finally(() => setPendingTaskId(null));
       }
-      setPendingTaskId(null);
     }
   }, [pendingTaskId, projects, loading, token]);
 
@@ -160,15 +158,17 @@ export default function KanbanBoard({ token, departments, userId, userName, isSu
     const handleMessage = (event: MessageEvent) => {
       if (event.data && event.data.type === 'OPEN_TASK' && event.data.taskId) {
         const taskId = event.data.taskId;
-        const taskToOpen = projects.find(p => p.id === taskId);
-        if (taskToOpen) {
-          setSelectedProject(taskToOpen);
-        } else {
-          // Task might be in a different department, set pending to fetch
-          setPendingTaskId(taskId);
-          // Refresh projects to get latest data
-          fetchProjects();
-        }
+        // Fetch the task directly to ensure we have the latest data
+        fetch(`/api/projects?id=${taskId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+          .then(res => res.json())
+          .then(data => {
+            if (data.success && data.data) {
+              setSelectedProject(data.data);
+            }
+          })
+          .catch(console.error);
       }
     };
 
@@ -176,7 +176,7 @@ export default function KanbanBoard({ token, departments, userId, userName, isSu
     return () => {
       navigator.serviceWorker?.removeEventListener('message', handleMessage);
     };
-  }, [projects, fetchProjects]);
+  }, [token]);
 
   const handleDragStart = (e: React.DragEvent, project: Project) => {
     setDraggedProject(project);
