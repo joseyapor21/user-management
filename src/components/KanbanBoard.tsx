@@ -121,37 +121,41 @@ export default function KanbanBoard({ token, departments, userId, userName, isSu
   // Check URL for openTask parameter (from push notification click)
   useEffect(() => {
     const openTaskId = searchParams.get('openTask');
-    if (openTaskId) {
-      setPendingTaskId(openTaskId);
+    if (openTaskId && token) {
+      // Fetch and open the task immediately
+      fetch(`/api/projects?id=${openTaskId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && data.data) {
+            setSelectedProject(data.data);
+          }
+        })
+        .catch(console.error);
+
       // Clear the URL parameter without refreshing
       router.replace('/dashboard', { scroll: false });
     }
-  }, [searchParams, router]);
+  }, [searchParams, router, token]);
 
-  // Open task when there's a pending task ID
+  // Open task when there's a pending task ID (from service worker message)
   useEffect(() => {
-    if (pendingTaskId && !loading) {
-      // First check if task is in current projects list
-      const taskToOpen = projects.find(p => p.id === pendingTaskId);
-      if (taskToOpen) {
-        setSelectedProject(taskToOpen);
-        setPendingTaskId(null);
-      } else {
-        // Task might be in a different department, fetch it directly
-        fetch(`/api/projects?id=${pendingTaskId}`, {
-          headers: { Authorization: `Bearer ${token}` },
+    if (pendingTaskId && token) {
+      // Fetch the task directly
+      fetch(`/api/projects?id=${pendingTaskId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && data.data) {
+            setSelectedProject(data.data);
+          }
         })
-          .then(res => res.json())
-          .then(data => {
-            if (data.success && data.data) {
-              setSelectedProject(data.data);
-            }
-          })
-          .catch(console.error)
-          .finally(() => setPendingTaskId(null));
-      }
+        .catch(console.error)
+        .finally(() => setPendingTaskId(null));
     }
-  }, [pendingTaskId, projects, loading, token]);
+  }, [pendingTaskId, token]);
 
   // Listen for service worker messages (when app is already open)
   useEffect(() => {

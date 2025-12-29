@@ -1,5 +1,6 @@
 // Service Worker for Push Notifications
 // CCOAN New York Dashboard
+// Version: 2.0 - Navigate to task on notification click
 
 self.addEventListener('push', function(event) {
   const data = event.data?.json() ?? {};
@@ -50,25 +51,35 @@ self.addEventListener('notificationclick', function(event) {
     return;
   }
 
-  const taskId = event.notification.data.taskId;
-  const baseUrl = event.notification.data.url || '/dashboard';
+  const taskId = event.notification.data?.taskId;
+  const baseUrl = event.notification.data?.url || '/dashboard';
   // Add taskId as URL parameter so the app can open the task modal
   const targetUrl = taskId ? baseUrl + '?openTask=' + taskId : baseUrl;
 
   // Open or focus the dashboard and navigate to the task
   event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
-      // Check if there's already an open window
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async function(clientList) {
+      // Check if there's already an open window on the dashboard
       for (const client of clientList) {
         if (client.url.includes('/dashboard') && 'focus' in client) {
-          // Post a message to the client to open the task
-          if (taskId) {
+          // On mobile, navigate to the URL with task parameter to ensure it opens
+          if ('navigate' in client && taskId) {
+            try {
+              await client.navigate(targetUrl);
+              return client.focus();
+            } catch (e) {
+              // Navigation failed, try message instead
+              client.postMessage({ type: 'OPEN_TASK', taskId: taskId });
+              return client.focus();
+            }
+          } else if (taskId) {
+            // Fallback: post message to open task
             client.postMessage({ type: 'OPEN_TASK', taskId: taskId });
           }
           return client.focus();
         }
       }
-      // Otherwise open a new window with the task parameter
+      // No existing window, open a new one with the task parameter
       if (clients.openWindow) {
         return clients.openWindow(targetUrl);
       }
