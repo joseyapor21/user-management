@@ -58,6 +58,7 @@ export default function TaskModal({
   const [newComment, setNewComment] = useState('');
   const [addingComment, setAddingComment] = useState(false);
   const commentInputRef = useRef<HTMLTextAreaElement>(null);
+  const commentsListRef = useRef<HTMLDivElement>(null);
   const [members, setMembers] = useState<User[]>([]);
   const [activeTab, setActiveTab] = useState<'details' | 'subtasks' | 'attachments' | 'dependencies' | 'activity' | 'comments'>('details');
   const [newLabelName, setNewLabelName] = useState('');
@@ -151,6 +152,13 @@ export default function TaskModal({
       fetchAvailableTasks();
     }
   }, [isEditing, fetchMembers, fetchAvailableTasks]);
+
+  // Scroll comments to bottom when tab opens or new comment added
+  useEffect(() => {
+    if (activeTab === 'comments' && commentsListRef.current) {
+      commentsListRef.current.scrollTop = commentsListRef.current.scrollHeight;
+    }
+  }, [activeTab, project.comments]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -1343,11 +1351,11 @@ export default function TaskModal({
               {activeTab === 'comments' && (
                 <div className="space-y-2">
                   {/* Messages List - iPhone style */}
-                  <div className="space-y-1 max-h-64 overflow-y-auto bg-gray-50 -mx-4 px-3 py-2">
+                  <div ref={commentsListRef} className="space-y-1 max-h-64 overflow-y-auto bg-gray-50 -mx-4 px-3 py-2">
                     {project.comments.length === 0 ? (
                       <p className="text-sm text-gray-400 text-center py-4">No messages yet</p>
                     ) : (
-                      [...project.comments].reverse().map((comment) => {
+                      [...project.comments].map((comment) => {
                         const isOwn = comment.userId === userId;
                         return (
                           <div key={comment.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
