@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="primary">#2563EB</color>
+    <color name="primary_dark">#1D4ED8</color>
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+    <color name="gray">#6B7280</color>
+    <color name="background">#F3F4F6</color>
+
+    <!-- Priority Colors -->
+    <color name="priority_low">#22C55E</color>
+    <color name="priority_medium">#EAB308</color>
+    <color name="priority_high">#F97316</color>
+    <color name="priority_urgent">#EF4444</color>
+
+    <!-- Status Colors -->
+    <color name="status_backlog">#6B7280</color>
+    <color name="status_todo">#EAB308</color>
+    <color name="status_in_progress">#3B82F6</color>
+    <color name="status_done">#22C55E</color>
+</resources>
