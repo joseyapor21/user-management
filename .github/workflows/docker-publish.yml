@@ -48,36 +48,3 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-  deploy-to-truenas:
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-
-    steps:
-      - name: Deploy to TrueNAS
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.TRUENAS_HOST }}
-          username: ${{ secrets.TRUENAS_USER }}
-          key: ${{ secrets.TRUENAS_SSH_KEY }}
-          port: ${{ secrets.TRUENAS_PORT || 22 }}
-          script: |
-            # Pull the latest image
-            docker pull ghcr.io/${{ github.repository }}:latest
-
-            # Restart the app using TrueNAS CLI
-            # Option 1: If using TrueNAS Apps (Kubernetes)
-            # midclt call chart.release.scale "user-management" '{"replica_count": 0}'
-            # sleep 5
-            # midclt call chart.release.scale "user-management" '{"replica_count": 1}'
-
-            # Option 2: If using Docker Compose
-            # cd /path/to/your/app && docker compose pull && docker compose up -d
-
-            # Option 3: If using plain Docker
-            # docker stop user-management || true
-            # docker rm user-management || true
-            # docker run -d --name user-management -p 3000:3000 ghcr.io/${{ github.repository }}:latest
-
-            echo "Deployment complete!"
