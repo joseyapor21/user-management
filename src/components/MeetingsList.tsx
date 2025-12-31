@@ -1,0 +1,390 @@
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+import { Meeting, Department } from '@/types';
+
+interface MeetingsListProps {
+  token: string;
+  isSuperUser: boolean;
+  onCreateMeeting: () => void;
+  refreshTrigger?: number;
+}
+
+export default function MeetingsList({
+  token,
+  isSuperUser,
+  onCreateMeeting,
+  refreshTrigger,
+}: MeetingsListProps) {
+  const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
+  const [editingMeeting, setEditingMeeting] = useState<Meeting | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+
+  const fetchMeetings = useCallback(async () => {
+    setLoading(true);
+    try {
+      const url = selectedDepartment === 'all'
+        ? '/api/meetings'
+        : `/api/meetings?departmentId=${selectedDepartment}`;
+
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success) {
+        setMeetings(data.data);
+      }
+    } catch (err) {
+      console.error('Error fetching meetings:', err);
+    }
+    setLoading(false);
+  }, [token, selectedDepartment]);
+
+  const fetchDepartments = useCallback(async () => {
+    try {
+      const res = await fetch('/api/departments', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success) {
+        setDepartments(data.data);
+      }
+    } catch (err) {
+      console.error('Error fetching departments:', err);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    fetchDepartments();
+  }, [fetchDepartments]);
+
+  useEffect(() => {
+    fetchMeetings();
+  }, [fetchMeetings, refreshTrigger]);
+
+  const handleDelete = async (meetingId: string) => {
+    if (!confirm('Are you sure you want to delete this meeting?')) return;
+
+    try {
+      const res = await fetch(`/api/meetings?id=${meetingId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success) {
+        setMeetings(meetings.filter(m => m.id !== meetingId));
+      } else {
+        alert(data.error || 'Failed to delete meeting');
+      }
+    } catch (err) {
+      console.error('Error deleting meeting:', err);
+      alert('Failed to delete meeting');
+    }
+  };
+
+  const handleEdit = (meeting: Meeting) => {
+    setEditingMeeting(meeting);
+    setShowEditModal(true);
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingMeeting) return;
+
+    try {
+      const res = await fetch('/api/meetings', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(editingMeeting),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setShowEditModal(false);
+        setEditingMeeting(null);
+        fetchMeetings();
+      } else {
+        alert(data.error || 'Failed to update meeting');
+      }
+    } catch (err) {
+      console.error('Error updating meeting:', err);
+      alert('Failed to update meeting');
+    }
+  };
+
+  const formatDateTime = (dateTime: string) => {
+    const date = new Date(dateTime);
+    return date.toLocaleString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+  };
+
+  const isUpcoming = (dateTime: string) => {
+    return new Date(dateTime) > new Date();
+  };
+
+  const upcomingMeetings = meetings.filter(m => isUpcoming(m.dateTime));
+  const pastMeetings = meetings.filter(m => !isUpcoming(m.dateTime));
+
+  return (
+    <div className="space-y-6">
+      {/* Header with filters and create button */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <h2 className="text-xl font-semibold text-gray-800">Meetings</h2>
+          <select
+            value={selectedDepartment}
+            onChange={(e) => setSelectedDepartment(e.target.value)}
+            className="px-3 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="all">All Departments</option>
+            {departments.map(dept => (
+              <option key={dept.id} value={dept.id}>{dept.name}</option>
+            ))}
+          </select>
+        </div>
+        {isSuperUser && (
+          <button
+            onClick={onCreateMeeting}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            + Schedule Meeting
+          </button>
+        )}
+      </div>
+
+      {loading ? (
+        <div className="text-center py-8 text-gray-500">Loading meetings...</div>
+      ) : meetings.length === 0 ? (
+        <div className="text-center py-8">
+          <p className="text-gray-500">No meetings scheduled</p>
+          {isSuperUser && (
+            <button
+              onClick={onCreateMeeting}
+              className="mt-4 text-blue-600 hover:text-blue-700"
+            >
+              Schedule your first meeting
+            </button>
+          )}
+        </div>
+      ) : (
+        <>
+          {/* Upcoming Meetings */}
+          {upcomingMeetings.length > 0 && (
+            <div>
+              <h3 className="text-lg font-medium text-gray-700 mb-3">Upcoming Meetings</h3>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {upcomingMeetings.map(meeting => (
+                  <MeetingCard
+                    key={meeting.id}
+                    meeting={meeting}
+                    isSuperUser={isSuperUser}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                    formatDateTime={formatDateTime}
+                    isUpcoming={true}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Past Meetings */}
+          {pastMeetings.length > 0 && (
+            <div>
+              <h3 className="text-lg font-medium text-gray-500 mb-3">Past Meetings</h3>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {pastMeetings.map(meeting => (
+                  <MeetingCard
+                    key={meeting.id}
+                    meeting={meeting}
+                    isSuperUser={isSuperUser}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                    formatDateTime={formatDateTime}
+                    isUpcoming={false}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Edit Modal */}
+      {showEditModal && editingMeeting && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">Edit Meeting</h3>
+              <form onSubmit={handleSaveEdit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Title
+                  </label>
+                  <input
+                    type="text"
+                    value={editingMeeting.title}
+                    onChange={(e) => setEditingMeeting({ ...editingMeeting, title: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Description
+                  </label>
+                  <textarea
+                    value={editingMeeting.description}
+                    onChange={(e) => setEditingMeeting({ ...editingMeeting, description: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    rows={3}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Date & Time
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={editingMeeting.dateTime.slice(0, 16)}
+                    onChange={(e) => setEditingMeeting({ ...editingMeeting, dateTime: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Department
+                  </label>
+                  <select
+                    value={editingMeeting.departmentId}
+                    onChange={(e) => setEditingMeeting({ ...editingMeeting, departmentId: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  >
+                    {departments.map(dept => (
+                      <option key={dept.id} value={dept.id}>{dept.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Location (optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={editingMeeting.location}
+                    onChange={(e) => setEditingMeeting({ ...editingMeeting, location: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="e.g., Conference Room A"
+                  />
+                </div>
+                <div className="flex justify-end gap-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowEditModal(false);
+                      setEditingMeeting(null);
+                    }}
+                    className="px-4 py-2 text-gray-700 hover:text-gray-900"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  >
+                    Save Changes
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface MeetingCardProps {
+  meeting: Meeting;
+  isSuperUser: boolean;
+  onEdit: (meeting: Meeting) => void;
+  onDelete: (meetingId: string) => void;
+  formatDateTime: (dateTime: string) => string;
+  isUpcoming: boolean;
+}
+
+function MeetingCard({
+  meeting,
+  isSuperUser,
+  onEdit,
+  onDelete,
+  formatDateTime,
+  isUpcoming,
+}: MeetingCardProps) {
+  return (
+    <div className={`bg-white rounded-lg shadow p-4 ${!isUpcoming ? 'opacity-60' : ''}`}>
+      <div className="flex justify-between items-start mb-2">
+        <h4 className="font-semibold text-gray-800">{meeting.title}</h4>
+        {isSuperUser && (
+          <div className="flex gap-2">
+            <button
+              onClick={() => onEdit(meeting)}
+              className="text-blue-500 hover:text-blue-700 text-sm"
+            >
+              Edit
+            </button>
+            <button
+              onClick={() => onDelete(meeting.id)}
+              className="text-red-500 hover:text-red-700 text-sm"
+            >
+              Delete
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-2 text-sm">
+        <div className="flex items-center gap-2 text-gray-600">
+          <span className="font-medium">When:</span>
+          <span>{formatDateTime(meeting.dateTime)}</span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="font-medium text-gray-600">Department:</span>
+          <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">
+            {meeting.departmentName}
+          </span>
+        </div>
+
+        {meeting.location && (
+          <div className="flex items-center gap-2 text-gray-600">
+            <span className="font-medium">Location:</span>
+            <span>{meeting.location}</span>
+          </div>
+        )}
+
+        {meeting.description && (
+          <p className="text-gray-600 mt-2 pt-2 border-t">{meeting.description}</p>
+        )}
+
+        <div className="text-xs text-gray-400 mt-2">
+          Scheduled by: {meeting.creatorName}
+        </div>
+      </div>
+    </div>
+  );
+}

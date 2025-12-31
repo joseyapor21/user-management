@@ -183,6 +183,24 @@ export const SCHEDULE_DEPARTMENTS = [
   'Worship',
 ] as const;
 
+// Meeting type
+export interface Meeting {
+  id: string;
+  _id?: string;
+  title: string;
+  description: string;
+  dateTime: string;
+  departmentId: string;
+  departmentName?: string;
+  location: string;
+  createdBy: string;
+  creatorName?: string;
+  metadata: {
+    createdAt: string;
+    updatedAt: string;
+  };
+}
+
 export interface Project {
   id: string;
   _id?: string;

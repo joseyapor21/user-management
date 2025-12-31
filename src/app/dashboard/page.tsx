@@ -11,8 +11,10 @@ import KanbanBoard from '@/components/KanbanBoard';
 import SundaySchedule from '@/components/SundaySchedule';
 import PushNotificationPrompt from '@/components/PushNotificationPrompt';
 import NotificationBell from '@/components/NotificationBell';
+import MeetingsList from '@/components/MeetingsList';
+import CreateMeetingModal from '@/components/CreateMeetingModal';
 
-type Tab = 'departments' | 'users' | 'projects' | 'invites' | 'schedule';
+type Tab = 'departments' | 'users' | 'projects' | 'invites' | 'schedule' | 'meetings';
 
 interface Invite {
   id: string;
@@ -63,6 +65,10 @@ export default function DashboardPage() {
 
   // Mobile menu state
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+
+  // Meetings state
+  const [showCreateMeetingModal, setShowCreateMeetingModal] = useState(false);
+  const [meetingsRefreshTrigger, setMeetingsRefreshTrigger] = useState(0);
 
   const fetchData = useCallback(async () => {
     setLoadingData(true);
@@ -551,6 +557,12 @@ export default function DashboardPage() {
           >
             Schedule
           </button>
+          <button
+            onClick={() => setActiveTab('meetings')}
+            className={`pb-2 px-3 md:px-4 whitespace-nowrap text-sm md:text-base ${activeTab === 'meetings' ? 'border-b-2 border-blue-600 text-blue-600 font-medium' : 'text-gray-600'}`}
+          >
+            Meetings
+          </button>
         </div>
       </div>
 
@@ -580,6 +592,16 @@ export default function DashboardPage() {
             token={token!}
             isSuperUser={user.isSuperUser}
             departments={departments}
+          />
+        )}
+
+        {/* Meetings Tab */}
+        {activeTab === 'meetings' && (
+          <MeetingsList
+            token={token!}
+            isSuperUser={user.isSuperUser}
+            onCreateMeeting={() => setShowCreateMeetingModal(true)}
+            refreshTrigger={meetingsRefreshTrigger}
           />
         )}
 
@@ -1040,6 +1062,14 @@ export default function DashboardPage() {
 
       {/* Push Notification Prompt */}
       {token && <PushNotificationPrompt token={token} />}
+
+      {/* Create Meeting Modal */}
+      <CreateMeetingModal
+        token={token!}
+        isOpen={showCreateMeetingModal}
+        onClose={() => setShowCreateMeetingModal(false)}
+        onCreated={() => setMeetingsRefreshTrigger(prev => prev + 1)}
+      />
     </div>
   );
 }
