@@ -146,7 +146,7 @@ export default function MeetingsList({
           <select
             value={selectedDepartment}
             onChange={(e) => setSelectedDepartment(e.target.value)}
-            className="px-3 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-3 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
           >
             <option value="all">All Departments</option>
             {departments.map(dept => (
@@ -237,7 +237,7 @@ export default function MeetingsList({
                     type="text"
                     value={editingMeeting.title}
                     onChange={(e) => setEditingMeeting({ ...editingMeeting, title: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
                     required
                   />
                 </div>
@@ -248,7 +248,7 @@ export default function MeetingsList({
                   <textarea
                     value={editingMeeting.description}
                     onChange={(e) => setEditingMeeting({ ...editingMeeting, description: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
                     rows={3}
                   />
                 </div>
@@ -260,7 +260,7 @@ export default function MeetingsList({
                     type="datetime-local"
                     value={editingMeeting.dateTime.slice(0, 16)}
                     onChange={(e) => setEditingMeeting({ ...editingMeeting, dateTime: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
                     required
                   />
                 </div>
@@ -271,7 +271,7 @@ export default function MeetingsList({
                   <select
                     value={editingMeeting.departmentId}
                     onChange={(e) => setEditingMeeting({ ...editingMeeting, departmentId: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
                     required
                   >
                     {departments.map(dept => (
@@ -287,7 +287,7 @@ export default function MeetingsList({
                     type="text"
                     value={editingMeeting.location}
                     onChange={(e) => setEditingMeeting({ ...editingMeeting, location: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
                     placeholder="e.g., Conference Room A"
                   />
                 </div>
