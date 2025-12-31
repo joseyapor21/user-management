@@ -21,6 +21,9 @@ webpush.setVapidDetails(
   VAPID_PRIVATE_KEY
 );
 
+// Notification types
+type NotificationType = 'new' | 'updated' | 'reminder';
+
 // Send push notification to department members
 async function sendMeetingNotification(
   departmentId: string,
@@ -28,7 +31,7 @@ async function sendMeetingNotification(
   title: string,
   date: string,
   startTime: string,
-  isReminder: boolean = false
+  notificationType: NotificationType = 'new'
 ) {
   const db = await getDatabase();
 
@@ -61,11 +64,28 @@ async function sendMeetingNotification(
     return `${hour12}:${minutes} ${ampm}`;
   };
 
+  let notificationTitle = '';
+  let notificationBody = '';
+
+  switch (notificationType) {
+    case 'reminder':
+      notificationTitle = `Meeting Reminder: ${title}`;
+      notificationBody = `Starting in 10 minutes at ${formatTime(startTime)}`;
+      break;
+    case 'updated':
+      notificationTitle = `Meeting Updated: ${title}`;
+      notificationBody = `${departmentName} - ${date} at ${formatTime(startTime)}`;
+      break;
+    case 'new':
+    default:
+      notificationTitle = `New Meeting: ${title}`;
+      notificationBody = `${departmentName} - ${date} at ${formatTime(startTime)}`;
+      break;
+  }
+
   const payload = JSON.stringify({
-    title: isReminder ? `Meeting Reminder: ${title}` : `New Meeting: ${title}`,
-    body: isReminder
-      ? `Starting in 10 minutes at ${formatTime(startTime)}`
-      : `${departmentName} - ${date} at ${formatTime(startTime)}`,
+    title: notificationTitle,
+    body: notificationBody,
     url: '/dashboard?tab=meetings',
     tag: `meeting-${Date.now()}`,
   });
@@ -259,7 +279,7 @@ export async function POST(request: NextRequest) {
         title.trim(),
         date,
         startTime,
-        false // Not a reminder
+        'new'
       );
     } catch (notifError) {
       console.error('Failed to send meeting notification:', notifError);
@@ -333,10 +353,25 @@ export async function PUT(request: NextRequest) {
           endTime,
           departmentId,
           location: location?.trim() || '',
+          reminderSent: false, // Reset reminder when meeting is updated
           'metadata.updatedAt': new Date().toISOString(),
         },
       }
     );
+
+    // Send push notification about the update to all department members
+    try {
+      await sendMeetingNotification(
+        departmentId,
+        department.name,
+        title.trim(),
+        date,
+        startTime,
+        'updated'
+      );
+    } catch (notifError) {
+      console.error('Failed to send meeting update notification:', notifError);
+    }
 
     return NextResponse.json({
       success: true,
