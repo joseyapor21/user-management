@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { User, Department } from '@/types';
@@ -31,7 +31,16 @@ interface Invite {
 export default function DashboardPage() {
   const { user, token, isLoading, logout } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<Tab>('projects');
+
+  // Handle tab parameter from URL (for notification navigation)
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam && ['departments', 'users', 'projects', 'invites', 'schedule', 'meetings'].includes(tabParam)) {
+      setActiveTab(tabParam as Tab);
+    }
+  }, [searchParams]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [loadingData, setLoadingData] = useState(true);

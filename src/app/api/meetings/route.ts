@@ -2,11 +2,88 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/lib/mongodb';
 import jwt from 'jsonwebtoken';
 import { ObjectId } from 'mongodb';
+import webpush from 'web-push';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 const COLLECTION_NAME = 'v5meetings';
 const USERS_COLLECTION = 'v5users';
 const DEPARTMENTS_COLLECTION = 'v5departments';
+const SUBSCRIPTIONS_COLLECTION = 'v5push_subscriptions';
+
+// VAPID keys for push notifications
+const VAPID_PUBLIC_KEY = 'BJhtjt4mkjp_f-dFU8PHLFRjDqFpeHncXVY2VwtiQH_5_GTdmtdj9K1or3pwkOWRTXWhLr7JVtlhfDVsuV-GqHI';
+const VAPID_PRIVATE_KEY = 'LD2qY1dgXDty4tPoB0s5LoCH_AlowBBIa26UBgocq1w';
+
+// Configure web-push
+webpush.setVapidDetails(
+  'mailto:admin@ccoan-ny.org',
+  VAPID_PUBLIC_KEY,
+  VAPID_PRIVATE_KEY
+);
+
+// Send push notification to department members
+async function sendMeetingNotification(
+  departmentId: string,
+  departmentName: string,
+  title: string,
+  date: string,
+  startTime: string,
+  isReminder: boolean = false
+) {
+  const db = await getDatabase();
+
+  // Get department to find all members
+  const department = await db.collection(DEPARTMENTS_COLLECTION).findOne({
+    _id: new ObjectId(departmentId)
+  });
+
+  if (!department) return;
+
+  // Get all user IDs in the department (admins + members)
+  const userIds = [...(department.adminIds || []), ...(department.memberIds || [])];
+
+  if (userIds.length === 0) return;
+
+  // Get all push subscriptions for these users
+  const subscriptions = await db.collection(SUBSCRIPTIONS_COLLECTION)
+    .find({ userId: { $in: userIds } })
+    .toArray();
+
+  if (subscriptions.length === 0) return;
+
+  // Format the time for display
+  const formatTime = (time: string) => {
+    if (!time) return '';
+    const [hours, minutes] = time.split(':');
+    const h = parseInt(hours);
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const hour12 = h % 12 || 12;
+    return `${hour12}:${minutes} ${ampm}`;
+  };
+
+  const payload = JSON.stringify({
+    title: isReminder ? `Meeting Reminder: ${title}` : `New Meeting: ${title}`,
+    body: isReminder
+      ? `Starting in 10 minutes at ${formatTime(startTime)}`
+      : `${departmentName} - ${date} at ${formatTime(startTime)}`,
+    url: '/dashboard?tab=meetings',
+    tag: `meeting-${Date.now()}`,
+  });
+
+  // Send to all subscriptions
+  await Promise.allSettled(
+    subscriptions.map(async (sub) => {
+      try {
+        await webpush.sendNotification(sub.subscription, payload);
+      } catch (error: unknown) {
+        const webPushError = error as { statusCode?: number };
+        if (webPushError.statusCode === 410 || webPushError.statusCode === 404) {
+          await db.collection(SUBSCRIPTIONS_COLLECTION).deleteOne({ _id: sub._id });
+        }
+      }
+    })
+  );
+}
 
 // Get user info from token
 async function getUserFromRequest(request: NextRequest) {
@@ -165,6 +242,7 @@ export async function POST(request: NextRequest) {
       departmentId,
       location: location?.trim() || '',
       createdBy: userInfo.userId,
+      reminderSent: false,
       metadata: {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -172,6 +250,21 @@ export async function POST(request: NextRequest) {
     };
 
     const result = await db.collection(COLLECTION_NAME).insertOne(newMeeting);
+
+    // Send push notification to all department members
+    try {
+      await sendMeetingNotification(
+        departmentId,
+        department.name,
+        title.trim(),
+        date,
+        startTime,
+        false // Not a reminder
+      );
+    } catch (notifError) {
+      console.error('Failed to send meeting notification:', notifError);
+      // Don't fail the request if notification fails
+    }
 
     return NextResponse.json({
       success: true,
