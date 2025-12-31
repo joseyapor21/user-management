@@ -13,6 +13,7 @@ import PushNotificationPrompt from '@/components/PushNotificationPrompt';
 import NotificationBell from '@/components/NotificationBell';
 import MeetingsList from '@/components/MeetingsList';
 import CreateMeetingModal from '@/components/CreateMeetingModal';
+import InstallPrompt from '@/components/InstallPrompt';
 
 type Tab = 'departments' | 'users' | 'projects' | 'invites' | 'schedule' | 'meetings';
 
@@ -1079,6 +1080,9 @@ export default function DashboardPage() {
         onClose={() => setShowCreateMeetingModal(false)}
         onCreated={() => setMeetingsRefreshTrigger(prev => prev + 1)}
       />
+
+      {/* PWA Install Prompt */}
+      <InstallPrompt />
     </div>
   );
 }
