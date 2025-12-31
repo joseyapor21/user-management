@@ -118,6 +118,7 @@ export default function MeetingsList({
   };
 
   const formatDate = (date: string) => {
+    if (!date) return 'No date';
     const d = new Date(date + 'T00:00:00');
     return d.toLocaleDateString('en-US', {
       weekday: 'short',
@@ -128,6 +129,7 @@ export default function MeetingsList({
   };
 
   const formatTime = (time: string) => {
+    if (!time) return 'N/A';
     const [hours, minutes] = time.split(':');
     const h = parseInt(hours);
     const ampm = h >= 12 ? 'PM' : 'AM';
@@ -136,6 +138,7 @@ export default function MeetingsList({
   };
 
   const isUpcoming = (date: string) => {
+    if (!date) return false;
     const meetingDate = new Date(date + 'T23:59:59');
     return meetingDate >= new Date();
   };
