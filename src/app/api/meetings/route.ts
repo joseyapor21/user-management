@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
     const meetings = await db
       .collection(COLLECTION_NAME)
       .find(query)
-      .sort({ dateTime: 1 })
+      .sort({ date: 1, startTime: 1 })
       .toArray();
 
     // Fetch department names for display
@@ -124,14 +124,22 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { title, description, dateTime, departmentId, location } = body;
+    const { title, description, date, startTime, endTime, departmentId, location } = body;
 
     if (!title || !title.trim()) {
       return NextResponse.json({ error: 'Meeting title is required' }, { status: 400 });
     }
 
-    if (!dateTime) {
-      return NextResponse.json({ error: 'Meeting date and time is required' }, { status: 400 });
+    if (!date) {
+      return NextResponse.json({ error: 'Meeting date is required' }, { status: 400 });
+    }
+
+    if (!startTime) {
+      return NextResponse.json({ error: 'Start time is required' }, { status: 400 });
+    }
+
+    if (!endTime) {
+      return NextResponse.json({ error: 'End time is required' }, { status: 400 });
     }
 
     if (!departmentId) {
@@ -151,7 +159,9 @@ export async function POST(request: NextRequest) {
     const newMeeting = {
       title: title.trim(),
       description: description?.trim() || '',
-      dateTime: new Date(dateTime).toISOString(),
+      date,
+      startTime,
+      endTime,
       departmentId,
       location: location?.trim() || '',
       createdBy: userInfo.userId,
@@ -183,7 +193,7 @@ export async function PUT(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { id, title, description, dateTime, departmentId, location } = body;
+    const { id, title, description, date, startTime, endTime, departmentId, location } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'Meeting ID is required' }, { status: 400 });
@@ -193,8 +203,16 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Meeting title is required' }, { status: 400 });
     }
 
-    if (!dateTime) {
-      return NextResponse.json({ error: 'Meeting date and time is required' }, { status: 400 });
+    if (!date) {
+      return NextResponse.json({ error: 'Meeting date is required' }, { status: 400 });
+    }
+
+    if (!startTime) {
+      return NextResponse.json({ error: 'Start time is required' }, { status: 400 });
+    }
+
+    if (!endTime) {
+      return NextResponse.json({ error: 'End time is required' }, { status: 400 });
     }
 
     if (!departmentId) {
@@ -217,7 +235,9 @@ export async function PUT(request: NextRequest) {
         $set: {
           title: title.trim(),
           description: description?.trim() || '',
-          dateTime: new Date(dateTime).toISOString(),
+          date,
+          startTime,
+          endTime,
           departmentId,
           location: location?.trim() || '',
           'metadata.updatedAt': new Date().toISOString(),

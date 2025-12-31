@@ -189,7 +189,9 @@ export interface Meeting {
   _id?: string;
   title: string;
   description: string;
-  dateTime: string;
+  date: string;
+  startTime: string;
+  endTime: string;
   departmentId: string;
   departmentName?: string;
   location: string;

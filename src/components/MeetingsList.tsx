@@ -117,25 +117,31 @@ export default function MeetingsList({
     }
   };
 
-  const formatDateTime = (dateTime: string) => {
-    const date = new Date(dateTime);
-    return date.toLocaleString('en-US', {
+  const formatDate = (date: string) => {
+    const d = new Date(date + 'T00:00:00');
+    return d.toLocaleDateString('en-US', {
       weekday: 'short',
       month: 'short',
       day: 'numeric',
       year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
     });
   };
 
-  const isUpcoming = (dateTime: string) => {
-    return new Date(dateTime) > new Date();
+  const formatTime = (time: string) => {
+    const [hours, minutes] = time.split(':');
+    const h = parseInt(hours);
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const hour12 = h % 12 || 12;
+    return `${hour12}:${minutes} ${ampm}`;
   };
 
-  const upcomingMeetings = meetings.filter(m => isUpcoming(m.dateTime));
-  const pastMeetings = meetings.filter(m => !isUpcoming(m.dateTime));
+  const isUpcoming = (date: string) => {
+    const meetingDate = new Date(date + 'T23:59:59');
+    return meetingDate >= new Date();
+  };
+
+  const upcomingMeetings = meetings.filter(m => isUpcoming(m.date));
+  const pastMeetings = meetings.filter(m => !isUpcoming(m.date));
 
   return (
     <div className="space-y-6">
@@ -192,7 +198,8 @@ export default function MeetingsList({
                     isSuperUser={isSuperUser}
                     onEdit={handleEdit}
                     onDelete={handleDelete}
-                    formatDateTime={formatDateTime}
+                    formatDate={formatDate}
+                    formatTime={formatTime}
                     isUpcoming={true}
                   />
                 ))}
@@ -212,7 +219,8 @@ export default function MeetingsList({
                     isSuperUser={isSuperUser}
                     onEdit={handleEdit}
                     onDelete={handleDelete}
-                    formatDateTime={formatDateTime}
+                    formatDate={formatDate}
+                    formatTime={formatTime}
                     isUpcoming={false}
                   />
                 ))}
@@ -254,15 +262,41 @@ export default function MeetingsList({
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Date & Time
+                    Date
                   </label>
                   <input
-                    type="datetime-local"
-                    value={editingMeeting.dateTime.slice(0, 16)}
-                    onChange={(e) => setEditingMeeting({ ...editingMeeting, dateTime: e.target.value })}
+                    type="date"
+                    value={editingMeeting.date}
+                    onChange={(e) => setEditingMeeting({ ...editingMeeting, date: e.target.value })}
                     className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
                     required
                   />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Start Time
+                    </label>
+                    <input
+                      type="time"
+                      value={editingMeeting.startTime}
+                      onChange={(e) => setEditingMeeting({ ...editingMeeting, startTime: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      End Time
+                    </label>
+                    <input
+                      type="time"
+                      value={editingMeeting.endTime}
+                      onChange={(e) => setEditingMeeting({ ...editingMeeting, endTime: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
+                      required
+                    />
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -323,7 +357,8 @@ interface MeetingCardProps {
   isSuperUser: boolean;
   onEdit: (meeting: Meeting) => void;
   onDelete: (meetingId: string) => void;
-  formatDateTime: (dateTime: string) => string;
+  formatDate: (date: string) => string;
+  formatTime: (time: string) => string;
   isUpcoming: boolean;
 }
 
@@ -332,7 +367,8 @@ function MeetingCard({
   isSuperUser,
   onEdit,
   onDelete,
-  formatDateTime,
+  formatDate,
+  formatTime,
   isUpcoming,
 }: MeetingCardProps) {
   return (
@@ -359,8 +395,13 @@ function MeetingCard({
 
       <div className="space-y-2 text-sm">
         <div className="flex items-center gap-2 text-gray-600">
-          <span className="font-medium">When:</span>
-          <span>{formatDateTime(meeting.dateTime)}</span>
+          <span className="font-medium">Date:</span>
+          <span>{formatDate(meeting.date)}</span>
+        </div>
+
+        <div className="flex items-center gap-2 text-gray-600">
+          <span className="font-medium">Time:</span>
+          <span>{formatTime(meeting.startTime)} - {formatTime(meeting.endTime)}</span>
         </div>
 
         <div className="flex items-center gap-2">
