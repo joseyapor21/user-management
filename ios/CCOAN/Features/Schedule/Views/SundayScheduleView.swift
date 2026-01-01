@@ -37,6 +37,9 @@ struct SundayScheduleView: View {
         .task {
             await viewModel.loadSchedule()
         }
+        .refreshable {
+            await viewModel.loadSchedule()
+        }
         .sheet(item: Binding(
             get: { editingCell.map { EditingCell(phase: $0.phase, department: $0.department) } },
             set: { editingCell = $0.map { ($0.phase, $0.department) } }

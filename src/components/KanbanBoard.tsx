@@ -576,11 +576,22 @@ export default function KanbanBoard({ token, departments, userId, userName, isSu
             )}
           </div>
 
+          {/* Refresh button */}
+          <button
+            onClick={() => { setLoading(true); fetchProjects(); }}
+            className="order-2 p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md"
+            title="Refresh"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
+
           {/* Add task button - prominent on mobile */}
           {canManageTasks && (
             <button
               onClick={() => handleAddTask('backlog')}
-              className="order-2 px-3 md:px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 flex items-center gap-1 md:gap-2 whitespace-nowrap"
+              className="order-3 px-3 md:px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 flex items-center gap-1 md:gap-2 whitespace-nowrap"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -591,7 +602,7 @@ export default function KanbanBoard({ token, departments, userId, userName, isSu
           )}
 
           {/* Board view toggle */}
-          <div className="flex rounded-md border border-gray-300 overflow-hidden order-3 w-full sm:w-auto">
+          <div className="flex rounded-md border border-gray-300 overflow-hidden order-4 w-full sm:w-auto">
             <button
               onClick={() => setBoardView('standard')}
               className={`flex-1 sm:flex-none px-3 py-2 text-sm ${

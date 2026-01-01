@@ -8,8 +8,12 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -22,7 +26,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.ccoan.ny.data.models.ScheduleDefaults
 import com.ccoan.ny.ui.theme.Primary
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
 fun ScheduleScreen(
     viewModel: ScheduleViewModel = hiltViewModel()
@@ -35,6 +39,16 @@ fun ScheduleScreen(
 
     var editingCell by remember { mutableStateOf<Pair<String, String>?>(null) }
     var editText by remember { mutableStateOf("") }
+    var isRefreshing by remember { mutableStateOf(false) }
+
+    val pullRefreshState = rememberPullRefreshState(
+        refreshing = isRefreshing,
+        onRefresh = {
+            isRefreshing = true
+            viewModel.loadSchedule()
+            isRefreshing = false
+        }
+    )
 
     val phases = ScheduleDefaults.DEFAULT_PHASES
     val departments = ScheduleDefaults.DEFAULT_DEPARTMENTS
@@ -43,7 +57,12 @@ fun ScheduleScreen(
         viewModel.loadSchedule()
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .pullRefresh(pullRefreshState)
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
         // Date navigation header
         Surface(
             color = MaterialTheme.colorScheme.surface,
@@ -226,6 +245,13 @@ fun ScheduleScreen(
                 }
             }
         }
+        }
+
+        PullRefreshIndicator(
+            refreshing = isRefreshing,
+            state = pullRefreshState,
+            modifier = Modifier.align(Alignment.TopCenter)
+        )
     }
 
     // Edit cell dialog

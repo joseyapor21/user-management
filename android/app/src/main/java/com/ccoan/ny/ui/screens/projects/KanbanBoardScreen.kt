@@ -9,8 +9,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,7 +28,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.ccoan.ny.data.models.*
 import com.ccoan.ny.ui.theme.*
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
 fun KanbanBoardScreen(
     isSuperUser: Boolean = false,
@@ -40,6 +44,16 @@ fun KanbanBoardScreen(
     var showCreateTask by remember { mutableStateOf(false) }
     var selectedTask by remember { mutableStateOf<Project?>(null) }
     var showFilters by remember { mutableStateOf(false) }
+    var isRefreshing by remember { mutableStateOf(false) }
+
+    val pullRefreshState = rememberPullRefreshState(
+        refreshing = isRefreshing,
+        onRefresh = {
+            isRefreshing = true
+            viewModel.loadData()
+            isRefreshing = false
+        }
+    )
 
     LaunchedEffect(Unit) {
         viewModel.loadData()
@@ -55,9 +69,14 @@ fun KanbanBoardScreen(
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        // Toolbar
-        Column(
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .pullRefresh(pullRefreshState)
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Toolbar
+            Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surface)
@@ -142,6 +161,13 @@ fun KanbanBoardScreen(
                 ViewMode.CALENDAR -> CalendarPlaceholder()
             }
         }
+        }
+
+        PullRefreshIndicator(
+            refreshing = isRefreshing,
+            state = pullRefreshState,
+            modifier = Modifier.align(Alignment.TopCenter)
+        )
     }
 
     // Create task bottom sheet
