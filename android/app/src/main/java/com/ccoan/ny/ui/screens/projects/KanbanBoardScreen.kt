@@ -44,15 +44,10 @@ fun KanbanBoardScreen(
     var showCreateTask by remember { mutableStateOf(false) }
     var selectedTask by remember { mutableStateOf<Project?>(null) }
     var showFilters by remember { mutableStateOf(false) }
-    var isRefreshing by remember { mutableStateOf(false) }
 
     val pullRefreshState = rememberPullRefreshState(
-        refreshing = isRefreshing,
-        onRefresh = {
-            isRefreshing = true
-            viewModel.loadData()
-            isRefreshing = false
-        }
+        refreshing = isLoading,
+        onRefresh = { viewModel.loadData() }
     )
 
     LaunchedEffect(Unit) {
@@ -164,7 +159,7 @@ fun KanbanBoardScreen(
         }
 
         PullRefreshIndicator(
-            refreshing = isRefreshing,
+            refreshing = isLoading,
             state = pullRefreshState,
             modifier = Modifier.align(Alignment.TopCenter)
         )

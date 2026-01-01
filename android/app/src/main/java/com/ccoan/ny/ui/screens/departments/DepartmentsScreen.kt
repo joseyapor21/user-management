@@ -37,15 +37,10 @@ fun DepartmentsScreen(
     var showCreateDialog by remember { mutableStateOf(false) }
     var editingDepartment by remember { mutableStateOf<Department?>(null) }
     var managingDepartment by remember { mutableStateOf<Department?>(null) }
-    var isRefreshing by remember { mutableStateOf(false) }
 
     val pullRefreshState = rememberPullRefreshState(
-        refreshing = isRefreshing,
-        onRefresh = {
-            isRefreshing = true
-            viewModel.loadData()
-            isRefreshing = false
-        }
+        refreshing = isLoading,
+        onRefresh = { viewModel.loadData() }
     )
 
     LaunchedEffect(Unit) {
@@ -127,7 +122,7 @@ fun DepartmentsScreen(
         }
 
         PullRefreshIndicator(
-            refreshing = isRefreshing,
+            refreshing = isLoading,
             state = pullRefreshState,
             modifier = Modifier.align(Alignment.TopCenter)
         )

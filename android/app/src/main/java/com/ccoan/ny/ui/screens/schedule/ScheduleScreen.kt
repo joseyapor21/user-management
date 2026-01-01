@@ -39,15 +39,10 @@ fun ScheduleScreen(
 
     var editingCell by remember { mutableStateOf<Pair<String, String>?>(null) }
     var editText by remember { mutableStateOf("") }
-    var isRefreshing by remember { mutableStateOf(false) }
 
     val pullRefreshState = rememberPullRefreshState(
-        refreshing = isRefreshing,
-        onRefresh = {
-            isRefreshing = true
-            viewModel.loadSchedule()
-            isRefreshing = false
-        }
+        refreshing = isLoading,
+        onRefresh = { viewModel.loadSchedule() }
     )
 
     val phases = ScheduleDefaults.DEFAULT_PHASES
@@ -248,7 +243,7 @@ fun ScheduleScreen(
         }
 
         PullRefreshIndicator(
-            refreshing = isRefreshing,
+            refreshing = isLoading,
             state = pullRefreshState,
             modifier = Modifier.align(Alignment.TopCenter)
         )
