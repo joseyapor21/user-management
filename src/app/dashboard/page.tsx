@@ -610,6 +610,9 @@ export default function DashboardPage() {
           <MeetingsList
             token={token!}
             isSuperUser={user.isSuperUser}
+            isAdmin={user.isAdmin}
+            userId={user.id}
+            adminDepartmentIds={departments.filter(d => d.adminIds?.includes(user.id)).map(d => d.id)}
             onCreateMeeting={() => setShowCreateMeetingModal(true)}
             refreshTrigger={meetingsRefreshTrigger}
           />
@@ -1104,6 +1107,8 @@ export default function DashboardPage() {
         isOpen={showCreateMeetingModal}
         onClose={() => setShowCreateMeetingModal(false)}
         onCreated={() => setMeetingsRefreshTrigger(prev => prev + 1)}
+        isSuperUser={user.isSuperUser}
+        adminDepartmentIds={departments.filter(d => d.adminIds?.includes(user.id)).map(d => d.id)}
       />
 
       {/* PWA Install Prompt */}

@@ -183,6 +183,9 @@ export const SCHEDULE_DEPARTMENTS = [
   'Worship',
 ] as const;
 
+// Meeting request status
+export type MeetingStatus = 'pending' | 'approved' | 'rejected';
+
 // Meeting type
 export interface Meeting {
   id: string;
@@ -197,6 +200,16 @@ export interface Meeting {
   location: string;
   createdBy: string;
   creatorName?: string;
+  status: MeetingStatus;
+  requestedBy?: string;
+  requestedByName?: string;
+  approvedBy?: string;
+  approvedByName?: string;
+  approvedAt?: string;
+  rejectedBy?: string;
+  rejectedByName?: string;
+  rejectedAt?: string;
+  rejectionReason?: string;
   metadata: {
     createdAt: string;
     updatedAt: string;

@@ -6,6 +6,9 @@ import { Meeting, Department } from '@/types';
 interface MeetingsListProps {
   token: string;
   isSuperUser: boolean;
+  isAdmin: boolean;
+  userId: string;
+  adminDepartmentIds: string[];
   onCreateMeeting: () => void;
   refreshTrigger?: number;
 }
@@ -13,6 +16,9 @@ interface MeetingsListProps {
 export default function MeetingsList({
   token,
   isSuperUser,
+  isAdmin,
+  userId,
+  adminDepartmentIds,
   onCreateMeeting,
   refreshTrigger,
 }: MeetingsListProps) {
@@ -22,6 +28,12 @@ export default function MeetingsList({
   const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
   const [editingMeeting, setEditingMeeting] = useState<Meeting | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [processingMeetingId, setProcessingMeetingId] = useState<string | null>(null);
+  const [showRejectModal, setShowRejectModal] = useState<Meeting | null>(null);
+  const [rejectionReason, setRejectionReason] = useState('');
+
+  // Check if user can request meetings (is admin of at least one department)
+  const canRequestMeeting = isAdmin || adminDepartmentIds.length > 0;
 
   // Weekly calendar state
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(() => getWeekStart(new Date()));
@@ -127,8 +139,75 @@ export default function MeetingsList({
   const meetingsForDate = (date: Date) => {
     const dateString = formatDateString(date);
     return meetings
-      .filter(m => m.date === dateString)
+      .filter(m => m.date === dateString && (m.status === 'approved' || !m.status))
       .sort((a, b) => a.startTime.localeCompare(b.startTime));
+  };
+
+  // Get pending meetings for superusers
+  const pendingMeetings = useMemo(() => {
+    return meetings.filter(m => m.status === 'pending');
+  }, [meetings]);
+
+  // Get user's own pending requests
+  const myPendingRequests = useMemo(() => {
+    return meetings.filter(m => m.status === 'pending' && m.requestedBy === userId);
+  }, [meetings, userId]);
+
+  // Approve meeting
+  const handleApprove = async (meetingId: string) => {
+    setProcessingMeetingId(meetingId);
+    try {
+      const res = await fetch('/api/meetings', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ id: meetingId, action: 'approve' }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        fetchMeetings();
+      } else {
+        alert(data.error || 'Failed to approve meeting');
+      }
+    } catch (err) {
+      console.error('Error approving meeting:', err);
+      alert('Failed to approve meeting');
+    }
+    setProcessingMeetingId(null);
+  };
+
+  // Reject meeting
+  const handleReject = async () => {
+    if (!showRejectModal) return;
+    setProcessingMeetingId(showRejectModal.id);
+    try {
+      const res = await fetch('/api/meetings', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          id: showRejectModal.id,
+          action: 'reject',
+          rejectionReason,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setShowRejectModal(null);
+        setRejectionReason('');
+        fetchMeetings();
+      } else {
+        alert(data.error || 'Failed to reject meeting');
+      }
+    } catch (err) {
+      console.error('Error rejecting meeting:', err);
+      alert('Failed to reject meeting');
+    }
+    setProcessingMeetingId(null);
   };
 
   const formatDayHeader = (date: Date) => {
@@ -227,12 +306,12 @@ export default function MeetingsList({
             </svg>
           </button>
         </div>
-        {isSuperUser && (
+        {(isSuperUser || canRequestMeeting) && (
           <button
             onClick={onCreateMeeting}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
-            + Schedule Meeting
+            {isSuperUser ? '+ Schedule Meeting' : '+ Request Meeting'}
           </button>
         )}
       </div>
@@ -241,6 +320,101 @@ export default function MeetingsList({
         <div className="text-center py-8 text-gray-500">Loading meetings...</div>
       ) : (
         <>
+          {/* Pending Meetings for SuperUsers */}
+          {isSuperUser && pendingMeetings.length > 0 && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+              <h3 className="text-lg font-semibold text-amber-800 mb-3 flex items-center gap-2">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Pending Meeting Requests ({pendingMeetings.length})
+              </h3>
+              <div className="space-y-3">
+                {pendingMeetings.map(meeting => (
+                  <div key={meeting.id} className="bg-white rounded-lg p-4 shadow-sm">
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-gray-800">{meeting.title}</h4>
+                        <p className="text-sm text-gray-600 mt-1">
+                          {meeting.date} • {formatTime(meeting.startTime)} - {formatTime(meeting.endTime)}
+                        </p>
+                        <div className="flex flex-wrap items-center gap-2 mt-2">
+                          <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">
+                            {meeting.departmentName}
+                          </span>
+                          {meeting.location && (
+                            <span className="text-xs text-gray-500 flex items-center gap-1">
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                              </svg>
+                              {meeting.location}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500 mt-2">
+                          Requested by: <span className="font-medium">{meeting.requestedByName || 'Unknown'}</span>
+                        </p>
+                        {meeting.description && (
+                          <p className="text-sm text-gray-600 mt-2">{meeting.description}</p>
+                        )}
+                      </div>
+                      <div className="flex gap-2 sm:flex-col">
+                        <button
+                          onClick={() => handleApprove(meeting.id)}
+                          disabled={processingMeetingId === meeting.id}
+                          className="flex-1 sm:flex-none px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 text-sm"
+                        >
+                          {processingMeetingId === meeting.id ? 'Processing...' : 'Approve'}
+                        </button>
+                        <button
+                          onClick={() => setShowRejectModal(meeting)}
+                          disabled={processingMeetingId === meeting.id}
+                          className="flex-1 sm:flex-none px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 text-sm"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* My Pending Requests (for non-superusers) */}
+          {!isSuperUser && myPendingRequests.length > 0 && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+              <h3 className="text-lg font-semibold text-blue-800 mb-3 flex items-center gap-2">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                My Pending Requests ({myPendingRequests.length})
+              </h3>
+              <div className="space-y-3">
+                {myPendingRequests.map(meeting => (
+                  <div key={meeting.id} className="bg-white rounded-lg p-4 shadow-sm">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h4 className="font-semibold text-gray-800">{meeting.title}</h4>
+                        <p className="text-sm text-gray-600 mt-1">
+                          {meeting.date} • {formatTime(meeting.startTime)} - {formatTime(meeting.endTime)}
+                        </p>
+                        <div className="flex items-center gap-2 mt-2">
+                          <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">
+                            {meeting.departmentName}
+                          </span>
+                          <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs">
+                            Awaiting Approval
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Week Navigation */}
           <div className="bg-white rounded-lg shadow p-4">
             <div className="flex items-center justify-between mb-2">
@@ -437,6 +611,51 @@ export default function MeetingsList({
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rejection Modal */}
+      {showRejectModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">Reject Meeting Request</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Rejecting: <span className="font-medium">{showRejectModal.title}</span>
+              </p>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Reason (optional)
+                </label>
+                <textarea
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
+                  rows={3}
+                  placeholder="Provide a reason for rejection..."
+                />
+              </div>
+              <div className="flex justify-end gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowRejectModal(null);
+                    setRejectionReason('');
+                  }}
+                  className="px-4 py-2 text-gray-700 hover:text-gray-900"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleReject}
+                  disabled={processingMeetingId === showRejectModal.id}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+                >
+                  {processingMeetingId === showRejectModal.id ? 'Rejecting...' : 'Reject'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

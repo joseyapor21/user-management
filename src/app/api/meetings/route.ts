@@ -22,7 +22,62 @@ webpush.setVapidDetails(
 );
 
 // Notification types
-type NotificationType = 'new' | 'updated' | 'reminder';
+type NotificationType = 'new' | 'updated' | 'reminder' | 'request' | 'approved' | 'rejected';
+
+// Format the time for display
+const formatTime = (time: string) => {
+  if (!time) return '';
+  const [hours, minutes] = time.split(':');
+  const h = parseInt(hours);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const hour12 = h % 12 || 12;
+  return `${hour12}:${minutes} ${ampm}`;
+};
+
+// Send push notification to specific users
+async function sendPushToUsers(
+  userIds: string[],
+  title: string,
+  body: string,
+  url: string = '/dashboard?tab=meetings'
+) {
+  if (userIds.length === 0) return;
+
+  const db = await getDatabase();
+  const subscriptions = await db.collection(SUBSCRIPTIONS_COLLECTION)
+    .find({ userId: { $in: userIds } })
+    .toArray();
+
+  if (subscriptions.length === 0) return;
+
+  const payload = JSON.stringify({
+    title,
+    body,
+    url,
+    tag: `meeting-${Date.now()}`,
+  });
+
+  await Promise.allSettled(
+    subscriptions.map(async (sub) => {
+      try {
+        await webpush.sendNotification(sub.subscription, payload);
+      } catch (error: unknown) {
+        const webPushError = error as { statusCode?: number };
+        if (webPushError.statusCode === 410 || webPushError.statusCode === 404) {
+          await db.collection(SUBSCRIPTIONS_COLLECTION).deleteOne({ _id: sub._id });
+        }
+      }
+    })
+  );
+}
+
+// Send push notification to all superusers
+async function notifySuperUsers(title: string, body: string, url: string = '/dashboard?tab=meetings') {
+  const db = await getDatabase();
+  const superUsers = await db.collection(USERS_COLLECTION).find({ isSuperUser: true }).toArray();
+  const superUserIds = superUsers.map(u => u._id.toString());
+  await sendPushToUsers(superUserIds, title, body, url);
+}
 
 // Send push notification to department members
 async function sendMeetingNotification(
@@ -47,23 +102,6 @@ async function sendMeetingNotification(
 
   if (userIds.length === 0) return;
 
-  // Get all push subscriptions for these users
-  const subscriptions = await db.collection(SUBSCRIPTIONS_COLLECTION)
-    .find({ userId: { $in: userIds } })
-    .toArray();
-
-  if (subscriptions.length === 0) return;
-
-  // Format the time for display
-  const formatTime = (time: string) => {
-    if (!time) return '';
-    const [hours, minutes] = time.split(':');
-    const h = parseInt(hours);
-    const ampm = h >= 12 ? 'PM' : 'AM';
-    const hour12 = h % 12 || 12;
-    return `${hour12}:${minutes} ${ampm}`;
-  };
-
   let notificationTitle = '';
   let notificationBody = '';
 
@@ -83,26 +121,7 @@ async function sendMeetingNotification(
       break;
   }
 
-  const payload = JSON.stringify({
-    title: notificationTitle,
-    body: notificationBody,
-    url: '/dashboard?tab=meetings',
-    tag: `meeting-${Date.now()}`,
-  });
-
-  // Send to all subscriptions
-  await Promise.allSettled(
-    subscriptions.map(async (sub) => {
-      try {
-        await webpush.sendNotification(sub.subscription, payload);
-      } catch (error: unknown) {
-        const webPushError = error as { statusCode?: number };
-        if (webPushError.statusCode === 410 || webPushError.statusCode === 404) {
-          await db.collection(SUBSCRIPTIONS_COLLECTION).deleteOne({ _id: sub._id });
-        }
-      }
-    })
-  );
+  await sendPushToUsers(userIds, notificationTitle, notificationBody);
 }
 
 // Get user info from token
@@ -123,12 +142,23 @@ async function getUserFromRequest(request: NextRequest) {
 
     return {
       userId: user._id.toString(),
+      userName: user.name || 'Unknown',
       isSuperUser: user.isSuperUser || false,
       isAdmin: user.isAdmin || false,
     };
   } catch {
     return null;
   }
+}
+
+// Check if user is admin of a specific department
+async function isUserDepartmentAdmin(userId: string, departmentId: string): Promise<boolean> {
+  const db = await getDatabase();
+  const department = await db.collection(DEPARTMENTS_COLLECTION).findOne({
+    _id: new ObjectId(departmentId),
+    adminIds: userId
+  });
+  return !!department;
 }
 
 // Get user's department IDs
@@ -155,6 +185,7 @@ export async function GET(request: NextRequest) {
     const db = await getDatabase();
     const { searchParams } = new URL(request.url);
     const departmentId = searchParams.get('departmentId');
+    const statusFilter = searchParams.get('status'); // 'pending', 'approved', 'rejected', or null for all
 
     const query: Record<string, unknown> = {};
 
@@ -176,6 +207,21 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Filter by status
+    if (statusFilter) {
+      query.status = statusFilter;
+    } else {
+      // By default, non-superusers only see approved meetings
+      // SuperUsers see all meetings including pending ones
+      if (!userInfo.isSuperUser) {
+        query.$or = [
+          { status: 'approved' },
+          { status: { $exists: false } }, // Legacy meetings without status
+          { requestedBy: userInfo.userId } // User can see their own pending requests
+        ];
+      }
+    }
+
     const meetings = await db
       .collection(COLLECTION_NAME)
       .find(query)
@@ -190,19 +236,30 @@ export async function GET(request: NextRequest) {
 
     const departmentMap = new Map(departments.map(d => [d._id.toString(), d.name]));
 
-    // Fetch creator names
-    const creatorIds = Array.from(new Set(meetings.map(m => m.createdBy)));
-    const creators = await db.collection(USERS_COLLECTION).find({
-      _id: { $in: creatorIds.map(id => new ObjectId(id)) }
+    // Fetch creator names and requester names
+    const userIdsToFetch = new Set<string>();
+    meetings.forEach(m => {
+      if (m.createdBy) userIdsToFetch.add(m.createdBy);
+      if (m.requestedBy) userIdsToFetch.add(m.requestedBy);
+      if (m.approvedBy) userIdsToFetch.add(m.approvedBy);
+      if (m.rejectedBy) userIdsToFetch.add(m.rejectedBy);
+    });
+
+    const users = await db.collection(USERS_COLLECTION).find({
+      _id: { $in: Array.from(userIdsToFetch).map(id => new ObjectId(id)) }
     }).toArray();
 
-    const creatorMap = new Map(creators.map(c => [c._id.toString(), c.name]));
+    const userMap = new Map(users.map(u => [u._id.toString(), u.name]));
 
     const normalizedMeetings = meetings.map((m) => ({
       ...m,
       id: m._id.toString(),
+      status: m.status || 'approved', // Legacy meetings are considered approved
       departmentName: departmentMap.get(m.departmentId) || 'Unknown',
-      creatorName: creatorMap.get(m.createdBy) || 'Unknown',
+      creatorName: userMap.get(m.createdBy) || 'Unknown',
+      requestedByName: m.requestedBy ? userMap.get(m.requestedBy) : undefined,
+      approvedByName: m.approvedBy ? userMap.get(m.approvedBy) : undefined,
+      rejectedByName: m.rejectedBy ? userMap.get(m.rejectedBy) : undefined,
     }));
 
     return NextResponse.json({ success: true, data: normalizedMeetings });
@@ -212,11 +269,11 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST - Create meeting (SuperUser only)
+// POST - Create meeting (SuperUser) or Request meeting (Department Admin)
 export async function POST(request: NextRequest) {
   const userInfo = await getUserFromRequest(request);
-  if (!userInfo?.isSuperUser) {
-    return NextResponse.json({ error: 'Unauthorized - SuperUser access required' }, { status: 403 });
+  if (!userInfo) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
@@ -253,7 +310,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Department not found' }, { status: 404 });
     }
 
-    const newMeeting = {
+    // Check if user is superuser or department admin
+    const isDeptAdmin = await isUserDepartmentAdmin(userInfo.userId, departmentId);
+
+    if (!userInfo.isSuperUser && !isDeptAdmin) {
+      return NextResponse.json({ error: 'Unauthorized - Must be SuperUser or Department Admin' }, { status: 403 });
+    }
+
+    // SuperUsers create approved meetings, Department Admins create pending requests
+    const meetingStatus = userInfo.isSuperUser ? 'approved' : 'pending';
+
+    const newMeeting: Record<string, unknown> = {
       title: title.trim(),
       description: description?.trim() || '',
       date,
@@ -262,6 +329,7 @@ export async function POST(request: NextRequest) {
       departmentId,
       location: location?.trim() || '',
       createdBy: userInfo.userId,
+      status: meetingStatus,
       reminderSent: false,
       metadata: {
         createdAt: new Date().toISOString(),
@@ -269,31 +337,164 @@ export async function POST(request: NextRequest) {
       },
     };
 
+    // Add requester info for pending meetings
+    if (meetingStatus === 'pending') {
+      newMeeting.requestedBy = userInfo.userId;
+      newMeeting.requestedByName = userInfo.userName;
+    }
+
     const result = await db.collection(COLLECTION_NAME).insertOne(newMeeting);
 
-    // Send push notification to all department members
+    // Send push notifications
     try {
-      await sendMeetingNotification(
-        departmentId,
-        department.name,
-        title.trim(),
-        date,
-        startTime,
-        'new'
-      );
+      if (meetingStatus === 'approved') {
+        // Notify department members of new approved meeting
+        await sendMeetingNotification(
+          departmentId,
+          department.name,
+          title.trim(),
+          date,
+          startTime,
+          'new'
+        );
+      } else {
+        // Notify superusers of new meeting request
+        await notifySuperUsers(
+          'New Meeting Request',
+          `${userInfo.userName} requested a meeting: "${title.trim()}" for ${department.name} on ${date}`
+        );
+      }
     } catch (notifError) {
       console.error('Failed to send meeting notification:', notifError);
-      // Don't fail the request if notification fails
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Meeting created successfully',
+      message: meetingStatus === 'approved'
+        ? 'Meeting created successfully'
+        : 'Meeting request submitted for approval',
       id: result.insertedId.toString(),
+      status: meetingStatus,
     });
   } catch (error) {
     console.error('Create meeting error:', error);
     return NextResponse.json({ error: 'Failed to create meeting' }, { status: 500 });
+  }
+}
+
+// PATCH - Approve or Reject meeting (SuperUser only)
+export async function PATCH(request: NextRequest) {
+  const userInfo = await getUserFromRequest(request);
+  if (!userInfo?.isSuperUser) {
+    return NextResponse.json({ error: 'Unauthorized - SuperUser access required' }, { status: 403 });
+  }
+
+  try {
+    const body = await request.json();
+    const { id, action, rejectionReason } = body;
+
+    if (!id) {
+      return NextResponse.json({ error: 'Meeting ID is required' }, { status: 400 });
+    }
+
+    if (!action || !['approve', 'reject'].includes(action)) {
+      return NextResponse.json({ error: 'Action must be "approve" or "reject"' }, { status: 400 });
+    }
+
+    const db = await getDatabase();
+
+    // Get the meeting
+    const meeting = await db.collection(COLLECTION_NAME).findOne({
+      _id: new ObjectId(id)
+    });
+
+    if (!meeting) {
+      return NextResponse.json({ error: 'Meeting not found' }, { status: 404 });
+    }
+
+    if (meeting.status !== 'pending') {
+      return NextResponse.json({ error: 'Meeting is not pending approval' }, { status: 400 });
+    }
+
+    // Get department info
+    const department = await db.collection(DEPARTMENTS_COLLECTION).findOne({
+      _id: new ObjectId(meeting.departmentId)
+    });
+
+    const now = new Date().toISOString();
+
+    if (action === 'approve') {
+      await db.collection(COLLECTION_NAME).updateOne(
+        { _id: new ObjectId(id) },
+        {
+          $set: {
+            status: 'approved',
+            approvedBy: userInfo.userId,
+            approvedByName: userInfo.userName,
+            approvedAt: now,
+            'metadata.updatedAt': now,
+          },
+        }
+      );
+
+      // Notify the requester
+      if (meeting.requestedBy) {
+        await sendPushToUsers(
+          [meeting.requestedBy],
+          'Meeting Approved',
+          `Your meeting request "${meeting.title}" has been approved`
+        );
+      }
+
+      // Notify department members
+      if (department) {
+        await sendMeetingNotification(
+          meeting.departmentId,
+          department.name,
+          meeting.title,
+          meeting.date,
+          meeting.startTime,
+          'new'
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: 'Meeting approved successfully',
+      });
+    } else {
+      await db.collection(COLLECTION_NAME).updateOne(
+        { _id: new ObjectId(id) },
+        {
+          $set: {
+            status: 'rejected',
+            rejectedBy: userInfo.userId,
+            rejectedByName: userInfo.userName,
+            rejectedAt: now,
+            rejectionReason: rejectionReason || '',
+            'metadata.updatedAt': now,
+          },
+        }
+      );
+
+      // Notify the requester
+      if (meeting.requestedBy) {
+        const reasonText = rejectionReason ? `: ${rejectionReason}` : '';
+        await sendPushToUsers(
+          [meeting.requestedBy],
+          'Meeting Rejected',
+          `Your meeting request "${meeting.title}" was rejected${reasonText}`
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: 'Meeting rejected',
+      });
+    }
+  } catch (error) {
+    console.error('Approve/Reject meeting error:', error);
+    return NextResponse.json({ error: 'Failed to process meeting request' }, { status: 500 });
   }
 }
 
