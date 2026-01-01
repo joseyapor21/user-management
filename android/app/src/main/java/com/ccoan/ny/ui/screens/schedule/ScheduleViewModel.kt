@@ -32,16 +32,11 @@ class ScheduleViewModel @Inject constructor(
 
     private val _currentDate = MutableStateFlow(nearestSunday(Date()))
 
-    private val _displayedMonth = MutableStateFlow(Date())
-    val displayedMonth: StateFlow<Date> = _displayedMonth.asStateFlow()
-
-    private val _calendarDays = MutableStateFlow<List<Date>>(emptyList())
-    val calendarDays: StateFlow<List<Date>> = _calendarDays.asStateFlow()
-
-    private val calendar = Calendar.getInstance()
+    private val _displayDate = MutableStateFlow("")
+    val displayDate: StateFlow<String> = _displayDate.asStateFlow()
 
     init {
-        updateCalendarDays()
+        updateDisplayDate()
     }
 
     private fun nearestSunday(date: Date): Date {
@@ -54,30 +49,9 @@ class ScheduleViewModel @Inject constructor(
         return cal.time
     }
 
-    private fun updateCalendarDays() {
-        val days = mutableListOf<Date>()
-        val cal = Calendar.getInstance()
-        cal.time = _displayedMonth.value
-
-        // Go to first day of month
-        cal.set(Calendar.DAY_OF_MONTH, 1)
-
-        // Go back to Sunday of the first week
-        val firstDayOfWeek = cal.get(Calendar.DAY_OF_WEEK)
-        cal.add(Calendar.DAY_OF_MONTH, -(firstDayOfWeek - Calendar.SUNDAY))
-
-        // Generate 42 days (6 weeks)
-        repeat(42) {
-            days.add(cal.time)
-            cal.add(Calendar.DAY_OF_MONTH, 1)
-        }
-
-        _calendarDays.value = days
-    }
-
-    fun getMonthYearString(): String {
-        val formatter = SimpleDateFormat("MMMM yyyy", Locale.US)
-        return formatter.format(_displayedMonth.value)
+    private fun updateDisplayDate() {
+        val formatter = SimpleDateFormat("EEEE, MMMM d, yyyy", Locale.US)
+        _displayDate.value = formatter.format(_currentDate.value)
     }
 
     private val dateString: String
@@ -85,31 +59,6 @@ class ScheduleViewModel @Inject constructor(
             val formatter = SimpleDateFormat("yyyy-MM-dd", Locale.US)
             return formatter.format(_currentDate.value)
         }
-
-    fun selectDate(date: Date) {
-        _currentDate.value = date
-    }
-
-    fun goToPreviousMonth() {
-        val cal = Calendar.getInstance()
-        cal.time = _displayedMonth.value
-        cal.add(Calendar.MONTH, -1)
-        _displayedMonth.value = cal.time
-        updateCalendarDays()
-    }
-
-    fun goToNextMonth() {
-        val cal = Calendar.getInstance()
-        cal.time = _displayedMonth.value
-        cal.add(Calendar.MONTH, 1)
-        _displayedMonth.value = cal.time
-        updateCalendarDays()
-    }
-
-    fun goToCurrentMonth() {
-        _displayedMonth.value = Date()
-        updateCalendarDays()
-    }
 
     fun loadSchedule() {
         viewModelScope.launch {
@@ -166,6 +115,7 @@ class ScheduleViewModel @Inject constructor(
         cal.time = _currentDate.value
         cal.add(Calendar.DAY_OF_MONTH, -7)
         _currentDate.value = cal.time
+        updateDisplayDate()
         loadSchedule()
     }
 
@@ -174,11 +124,13 @@ class ScheduleViewModel @Inject constructor(
         cal.time = _currentDate.value
         cal.add(Calendar.DAY_OF_MONTH, 7)
         _currentDate.value = cal.time
+        updateDisplayDate()
         loadSchedule()
     }
 
     fun goToToday() {
         _currentDate.value = nearestSunday(Date())
+        updateDisplayDate()
         loadSchedule()
     }
 }

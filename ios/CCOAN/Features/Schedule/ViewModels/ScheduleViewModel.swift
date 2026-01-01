@@ -9,15 +9,12 @@ class ScheduleViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var currentDate: Date
-    @Published var displayedMonth: Date
 
     private let apiClient = APIClient.shared
-    private let calendar = Calendar.current
 
     init() {
-        let now = Date()
-        self.currentDate = ScheduleViewModel.nearestSunday(from: now)
-        self.displayedMonth = now
+        // Start with the nearest Sunday
+        self.currentDate = ScheduleViewModel.nearestSunday(from: Date())
     }
 
     static func nearestSunday(from date: Date) -> Date {
@@ -40,61 +37,12 @@ class ScheduleViewModel: ObservableObject {
         return formatter.string(from: currentDate)
     }
 
-    var monthYearString: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMMM yyyy"
-        return formatter.string(from: displayedMonth)
-    }
-
     var phases: [String] {
         config?.phases ?? Constants.Schedule.defaultPhases
     }
 
     var departments: [String] {
         config?.departments ?? Constants.Schedule.defaultDepartments
-    }
-
-    // Generate all days to display in the calendar grid (including padding days from prev/next month)
-    var calendarDays: [Date] {
-        guard let monthInterval = calendar.dateInterval(of: .month, for: displayedMonth),
-              let firstWeek = calendar.dateInterval(of: .weekOfMonth, for: monthInterval.start) else {
-            return []
-        }
-
-        var days: [Date] = []
-        var current = firstWeek.start
-
-        // Generate 6 weeks of days (42 days total for consistent grid)
-        for _ in 0..<42 {
-            days.append(current)
-            current = calendar.date(byAdding: .day, value: 1, to: current) ?? current
-        }
-
-        return days
-    }
-
-    func isCurrentMonth(_ date: Date) -> Bool {
-        calendar.isDate(date, equalTo: displayedMonth, toGranularity: .month)
-    }
-
-    func selectDate(_ date: Date) {
-        currentDate = date
-    }
-
-    func goToPreviousMonth() {
-        if let newMonth = calendar.date(byAdding: .month, value: -1, to: displayedMonth) {
-            displayedMonth = newMonth
-        }
-    }
-
-    func goToNextMonth() {
-        if let newMonth = calendar.date(byAdding: .month, value: 1, to: displayedMonth) {
-            displayedMonth = newMonth
-        }
-    }
-
-    func goToCurrentMonth() {
-        displayedMonth = Date()
     }
 
     func loadSchedule() async {
@@ -154,6 +102,7 @@ class ScheduleViewModel: ObservableObject {
     }
 
     func goToPreviousSunday() {
+        let calendar = Calendar.current
         if let newDate = calendar.date(byAdding: .day, value: -7, to: currentDate) {
             currentDate = newDate
             Task { await loadSchedule() }
@@ -161,6 +110,7 @@ class ScheduleViewModel: ObservableObject {
     }
 
     func goToNextSunday() {
+        let calendar = Calendar.current
         if let newDate = calendar.date(byAdding: .day, value: 7, to: currentDate) {
             currentDate = newDate
             Task { await loadSchedule() }

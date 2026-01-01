@@ -6,9 +6,11 @@ struct MeetingsListView: View {
     @State private var showingCreateMeeting = false
     @State private var editingMeeting: Meeting?
 
+    private let daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+
     var body: some View {
         VStack(spacing: 0) {
-            // Header with filter
+            // Header with filter and create button
             HStack {
                 Picker("Department", selection: $viewModel.selectedDepartmentId) {
                     Text("All Departments").tag(nil as String?)
@@ -39,59 +41,18 @@ struct MeetingsListView: View {
                 }
             } else {
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 16) {
-                        // Upcoming meetings
-                        if !viewModel.upcomingMeetings.isEmpty {
-                            Text("Upcoming")
-                                .font(.headline)
-                                .padding(.horizontal)
+                    VStack(spacing: 0) {
+                        // Calendar View
+                        calendarView
+                            .padding(.bottom, 16)
 
-                            ForEach(viewModel.upcomingMeetings) { meeting in
-                                MeetingCard(
-                                    meeting: meeting,
-                                    isSuperUser: authViewModel.isSuperUser,
-                                    onEdit: { editingMeeting = meeting },
-                                    onDelete: {
-                                        Task { await viewModel.deleteMeeting(id: meeting.id) }
-                                    }
-                                )
-                                .padding(.horizontal)
-                            }
-                        }
-
-                        // Past meetings
-                        if !viewModel.pastMeetings.isEmpty {
-                            Text("Past")
-                                .font(.headline)
-                                .padding(.horizontal)
-                                .padding(.top, viewModel.upcomingMeetings.isEmpty ? 0 : 16)
-
-                            ForEach(viewModel.pastMeetings) { meeting in
-                                MeetingCard(
-                                    meeting: meeting,
-                                    isSuperUser: authViewModel.isSuperUser,
-                                    isPast: true,
-                                    onEdit: { editingMeeting = meeting },
-                                    onDelete: {
-                                        Task { await viewModel.deleteMeeting(id: meeting.id) }
-                                    }
-                                )
-                                .padding(.horizontal)
-                            }
-                        }
-
-                        if viewModel.upcomingMeetings.isEmpty && viewModel.pastMeetings.isEmpty {
-                            EmptyStateView(
-                                icon: "calendar.badge.exclamationmark",
-                                title: "No Meetings",
-                                message: authViewModel.isSuperUser ?
-                                    "Schedule a meeting to get started" :
-                                    "No meetings scheduled for your departments"
-                            )
-                            .padding(.top, 60)
+                        // Meetings for selected date or all meetings
+                        if let selectedDate = viewModel.selectedDate {
+                            selectedDateMeetingsView(selectedDate)
+                        } else {
+                            allMeetingsView
                         }
                     }
-                    .padding(.vertical)
                 }
             }
         }
@@ -107,6 +68,268 @@ struct MeetingsListView: View {
         .refreshable {
             await viewModel.loadData()
         }
+    }
+
+    // MARK: - Calendar View
+
+    private var calendarView: some View {
+        VStack(spacing: 0) {
+            // Month navigation
+            HStack {
+                Button {
+                    viewModel.goToPreviousMonth()
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.title2)
+                }
+
+                Spacer()
+
+                VStack {
+                    Text(viewModel.monthYearString)
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                }
+
+                Spacer()
+
+                Button {
+                    viewModel.goToNextMonth()
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .font(.title2)
+                }
+            }
+            .padding(.horizontal)
+            .padding(.vertical, 12)
+
+            // Today button
+            Button("Today") {
+                viewModel.goToCurrentMonth()
+                viewModel.selectedDate = nil
+            }
+            .font(.caption)
+            .padding(.bottom, 8)
+
+            // Days of week header
+            HStack(spacing: 0) {
+                ForEach(daysOfWeek, id: \.self) { day in
+                    Text(day)
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(day == "Sun" ? .blue : .secondary)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.bottom, 8)
+
+            // Calendar grid
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 0), count: 7), spacing: 0) {
+                ForEach(viewModel.calendarDays, id: \.self) { date in
+                    CalendarDayCell(
+                        date: date,
+                        isCurrentMonth: viewModel.isCurrentMonth(date),
+                        isToday: viewModel.isToday(date),
+                        isSelected: viewModel.isSelected(date),
+                        hasMeetings: viewModel.hasMeetings(on: date)
+                    )
+                    .onTapGesture {
+                        if viewModel.isCurrentMonth(date) {
+                            if viewModel.isSelected(date) {
+                                viewModel.selectedDate = nil
+                            } else {
+                                viewModel.selectDate(date)
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, 8)
+
+            // Legend
+            HStack(spacing: 16) {
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(Color.blue)
+                        .frame(width: 8, height: 8)
+                    Text("Has meetings")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(Color.green)
+                        .frame(width: 8, height: 8)
+                    Text("Today")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding(.top, 12)
+        }
+        .background(Color(.systemBackground))
+    }
+
+    // MARK: - Selected Date Meetings
+
+    private func selectedDateMeetingsView(_ date: Date) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text(formatSelectedDate(date))
+                    .font(.headline)
+
+                Spacer()
+
+                Button("Show All") {
+                    viewModel.selectedDate = nil
+                }
+                .font(.caption)
+            }
+            .padding(.horizontal)
+
+            let meetings = viewModel.meetingsForDate(date)
+            if meetings.isEmpty {
+                VStack(spacing: 8) {
+                    Image(systemName: "calendar.badge.exclamationmark")
+                        .font(.largeTitle)
+                        .foregroundColor(.secondary)
+                    Text("No meetings on this day")
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 40)
+            } else {
+                ForEach(meetings) { meeting in
+                    MeetingCard(
+                        meeting: meeting,
+                        isSuperUser: authViewModel.isSuperUser,
+                        onEdit: { editingMeeting = meeting },
+                        onDelete: {
+                            Task { await viewModel.deleteMeeting(id: meeting.id) }
+                        }
+                    )
+                    .padding(.horizontal)
+                }
+            }
+        }
+        .padding(.vertical)
+    }
+
+    private func formatSelectedDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEE, MMMM d, yyyy"
+        return formatter.string(from: date)
+    }
+
+    // MARK: - All Meetings View
+
+    private var allMeetingsView: some View {
+        LazyVStack(alignment: .leading, spacing: 16) {
+            // Upcoming meetings
+            if !viewModel.upcomingMeetings.isEmpty {
+                Text("Upcoming")
+                    .font(.headline)
+                    .padding(.horizontal)
+
+                ForEach(viewModel.upcomingMeetings) { meeting in
+                    MeetingCard(
+                        meeting: meeting,
+                        isSuperUser: authViewModel.isSuperUser,
+                        onEdit: { editingMeeting = meeting },
+                        onDelete: {
+                            Task { await viewModel.deleteMeeting(id: meeting.id) }
+                        }
+                    )
+                    .padding(.horizontal)
+                }
+            }
+
+            // Past meetings
+            if !viewModel.pastMeetings.isEmpty {
+                Text("Past")
+                    .font(.headline)
+                    .padding(.horizontal)
+                    .padding(.top, viewModel.upcomingMeetings.isEmpty ? 0 : 16)
+
+                ForEach(viewModel.pastMeetings) { meeting in
+                    MeetingCard(
+                        meeting: meeting,
+                        isSuperUser: authViewModel.isSuperUser,
+                        isPast: true,
+                        onEdit: { editingMeeting = meeting },
+                        onDelete: {
+                            Task { await viewModel.deleteMeeting(id: meeting.id) }
+                        }
+                    )
+                    .padding(.horizontal)
+                }
+            }
+
+            if viewModel.upcomingMeetings.isEmpty && viewModel.pastMeetings.isEmpty {
+                EmptyStateView(
+                    icon: "calendar.badge.exclamationmark",
+                    title: "No Meetings",
+                    message: authViewModel.isSuperUser ?
+                        "Schedule a meeting to get started" :
+                        "No meetings scheduled for your departments"
+                )
+                .padding(.top, 60)
+            }
+        }
+        .padding(.vertical)
+    }
+}
+
+// MARK: - Calendar Day Cell
+
+struct CalendarDayCell: View {
+    let date: Date
+    let isCurrentMonth: Bool
+    let isToday: Bool
+    let isSelected: Bool
+    let hasMeetings: Bool
+
+    private var dayOfMonth: Int {
+        Calendar.current.component(.day, from: date)
+    }
+
+    var body: some View {
+        VStack(spacing: 2) {
+            ZStack {
+                if isToday {
+                    Circle()
+                        .fill(Color.green)
+                        .frame(width: 32, height: 32)
+                } else if isSelected {
+                    Circle()
+                        .fill(Color.blue)
+                        .frame(width: 32, height: 32)
+                } else if hasMeetings && isCurrentMonth {
+                    Circle()
+                        .stroke(Color.blue, lineWidth: 2)
+                        .frame(width: 32, height: 32)
+                }
+
+                Text("\(dayOfMonth)")
+                    .font(.subheadline)
+                    .fontWeight(hasMeetings ? .semibold : .regular)
+                    .foregroundColor(
+                        isToday || isSelected ? .white :
+                        !isCurrentMonth ? .gray.opacity(0.3) :
+                        hasMeetings ? .blue : .primary
+                    )
+            }
+
+            if hasMeetings && isCurrentMonth {
+                Circle()
+                    .fill(Color.blue.opacity(0.6))
+                    .frame(width: 4, height: 4)
+            } else {
+                Spacer().frame(height: 4)
+            }
+        }
+        .frame(height: 44)
     }
 }
 

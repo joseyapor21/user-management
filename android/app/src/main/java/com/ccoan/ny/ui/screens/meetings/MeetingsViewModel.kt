@@ -9,6 +9,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.*
 import javax.inject.Inject
 
 @HiltViewModel
@@ -30,6 +32,140 @@ class MeetingsViewModel @Inject constructor(
 
     private val _selectedDepartmentId = MutableStateFlow<String?>(null)
     val selectedDepartmentId: StateFlow<String?> = _selectedDepartmentId.asStateFlow()
+
+    // Calendar state
+    private val _displayedMonth = MutableStateFlow(Date())
+    val displayedMonth: StateFlow<Date> = _displayedMonth.asStateFlow()
+
+    private val _selectedDate = MutableStateFlow<Date?>(null)
+    val selectedDate: StateFlow<Date?> = _selectedDate.asStateFlow()
+
+    private val _calendarDays = MutableStateFlow<List<Date>>(emptyList())
+    val calendarDays: StateFlow<List<Date>> = _calendarDays.asStateFlow()
+
+    private val calendar = Calendar.getInstance()
+
+    init {
+        updateCalendarDays()
+    }
+
+    // MARK: - Calendar Methods
+
+    private fun updateCalendarDays() {
+        val days = mutableListOf<Date>()
+        val cal = Calendar.getInstance()
+        cal.time = _displayedMonth.value
+
+        // Go to first day of month
+        cal.set(Calendar.DAY_OF_MONTH, 1)
+
+        // Go back to Sunday of the first week
+        val firstDayOfWeek = cal.get(Calendar.DAY_OF_WEEK)
+        cal.add(Calendar.DAY_OF_MONTH, -(firstDayOfWeek - Calendar.SUNDAY))
+
+        // Generate 42 days (6 weeks)
+        repeat(42) {
+            days.add(cal.time)
+            cal.add(Calendar.DAY_OF_MONTH, 1)
+        }
+
+        _calendarDays.value = days
+    }
+
+    fun getMonthYearString(): String {
+        val formatter = SimpleDateFormat("MMMM yyyy", Locale.US)
+        return formatter.format(_displayedMonth.value)
+    }
+
+    fun goToPreviousMonth() {
+        val cal = Calendar.getInstance()
+        cal.time = _displayedMonth.value
+        cal.add(Calendar.MONTH, -1)
+        _displayedMonth.value = cal.time
+        updateCalendarDays()
+    }
+
+    fun goToNextMonth() {
+        val cal = Calendar.getInstance()
+        cal.time = _displayedMonth.value
+        cal.add(Calendar.MONTH, 1)
+        _displayedMonth.value = cal.time
+        updateCalendarDays()
+    }
+
+    fun goToCurrentMonth() {
+        _displayedMonth.value = Date()
+        _selectedDate.value = null
+        updateCalendarDays()
+    }
+
+    fun selectDate(date: Date?) {
+        _selectedDate.value = date
+    }
+
+    fun isCurrentMonth(date: Date): Boolean {
+        val displayCal = Calendar.getInstance().apply { time = _displayedMonth.value }
+        val dateCal = Calendar.getInstance().apply { time = date }
+        return displayCal.get(Calendar.MONTH) == dateCal.get(Calendar.MONTH) &&
+                displayCal.get(Calendar.YEAR) == dateCal.get(Calendar.YEAR)
+    }
+
+    fun isToday(date: Date): Boolean {
+        val todayCal = Calendar.getInstance()
+        val dateCal = Calendar.getInstance().apply { time = date }
+        return todayCal.get(Calendar.YEAR) == dateCal.get(Calendar.YEAR) &&
+                todayCal.get(Calendar.DAY_OF_YEAR) == dateCal.get(Calendar.DAY_OF_YEAR)
+    }
+
+    fun isSelected(date: Date): Boolean {
+        val selected = _selectedDate.value ?: return false
+        val selectedCal = Calendar.getInstance().apply { time = selected }
+        val dateCal = Calendar.getInstance().apply { time = date }
+        return selectedCal.get(Calendar.YEAR) == dateCal.get(Calendar.YEAR) &&
+                selectedCal.get(Calendar.DAY_OF_YEAR) == dateCal.get(Calendar.DAY_OF_YEAR)
+    }
+
+    fun hasMeetings(date: Date): Boolean {
+        val dateFormatter = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        val dateString = dateFormatter.format(date)
+        return getFilteredMeetings().any { it.date == dateString }
+    }
+
+    fun meetingsForDate(date: Date): List<Meeting> {
+        val dateFormatter = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        val dateString = dateFormatter.format(date)
+        return getFilteredMeetings()
+            .filter { it.date == dateString }
+            .sortedBy { it.startTime }
+    }
+
+    fun formatSelectedDate(date: Date): String {
+        val formatter = SimpleDateFormat("EEEE, MMMM d, yyyy", Locale.US)
+        return formatter.format(date)
+    }
+
+    // MARK: - Filtering
+
+    private fun getFilteredMeetings(): List<Meeting> {
+        val deptId = _selectedDepartmentId.value
+        return if (deptId != null) {
+            _meetings.value.filter { it.departmentId == deptId }
+        } else {
+            _meetings.value
+        }
+    }
+
+    fun getUpcomingMeetings(): List<Meeting> {
+        return getFilteredMeetings()
+            .filter { it.isUpcoming }
+            .sortedBy { it.date }
+    }
+
+    fun getPastMeetings(): List<Meeting> {
+        return getFilteredMeetings()
+            .filter { !it.isUpcoming }
+            .sortedByDescending { it.date }
+    }
 
     fun loadData() {
         viewModelScope.launch {
