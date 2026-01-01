@@ -391,7 +391,7 @@ export async function PATCH(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { id, action, rejectionReason } = body;
+    const { id, action, rejectionReason, date, startTime, endTime } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'Meeting ID is required' }, { status: 400 });
@@ -424,11 +424,22 @@ export async function PATCH(request: NextRequest) {
     const now = new Date().toISOString();
 
     if (action === 'approve') {
+      // Use modified date/time if provided, otherwise use original
+      const finalDate = date || meeting.date;
+      const finalStartTime = startTime || meeting.startTime;
+      const finalEndTime = endTime || meeting.endTime;
+
+      // Check if date/time was modified
+      const wasModified = date !== meeting.date || startTime !== meeting.startTime || endTime !== meeting.endTime;
+
       await db.collection(COLLECTION_NAME).updateOne(
         { _id: new ObjectId(id) },
         {
           $set: {
             status: 'approved',
+            date: finalDate,
+            startTime: finalStartTime,
+            endTime: finalEndTime,
             approvedBy: userInfo.userId,
             approvedByName: userInfo.userName,
             approvedAt: now,
@@ -439,10 +450,13 @@ export async function PATCH(request: NextRequest) {
 
       // Notify the requester
       if (meeting.requestedBy) {
+        const modifiedNote = wasModified
+          ? ` (Rescheduled to ${finalDate} at ${formatTime(finalStartTime)})`
+          : '';
         await sendPushToUsers(
           [meeting.requestedBy],
           'Meeting Approved',
-          `Your meeting request "${meeting.title}" has been approved`
+          `Your meeting request "${meeting.title}" has been approved${modifiedNote}`
         );
       }
 
@@ -452,8 +466,8 @@ export async function PATCH(request: NextRequest) {
           meeting.departmentId,
           department.name,
           meeting.title,
-          meeting.date,
-          meeting.startTime,
+          finalDate,
+          finalStartTime,
           'new'
         );
       }

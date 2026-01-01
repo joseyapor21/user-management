@@ -31,6 +31,12 @@ export default function MeetingsList({
   const [processingMeetingId, setProcessingMeetingId] = useState<string | null>(null);
   const [showRejectModal, setShowRejectModal] = useState<Meeting | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
+  const [showApproveModal, setShowApproveModal] = useState<Meeting | null>(null);
+  const [approveFormData, setApproveFormData] = useState({
+    date: '',
+    startTime: '',
+    endTime: '',
+  });
 
   // Check if user can request meetings (is admin of at least one department)
   const canRequestMeeting = isAdmin || adminDepartmentIds.length > 0;
@@ -153,9 +159,53 @@ export default function MeetingsList({
     return meetings.filter(m => m.status === 'pending' && m.requestedBy === userId);
   }, [meetings, userId]);
 
-  // Approve meeting
-  const handleApprove = async (meetingId: string) => {
-    setProcessingMeetingId(meetingId);
+  // Check for conflicts with a given meeting time
+  const getConflicts = useCallback((date: string, startTime: string, endTime: string, departmentId: string, excludeMeetingId?: string) => {
+    return meetings.filter(m => {
+      // Exclude the current meeting being checked
+      if (excludeMeetingId && m.id === excludeMeetingId) return false;
+      // Only check approved meetings in the same department
+      if (m.departmentId !== departmentId) return false;
+      if (m.status !== 'approved' && m.status !== undefined) return false;
+      if (m.date !== date) return false;
+
+      // Check time overlap
+      const newStart = startTime.replace(':', '');
+      const newEnd = endTime.replace(':', '');
+      const existStart = m.startTime.replace(':', '');
+      const existEnd = m.endTime.replace(':', '');
+
+      // Overlap if: newStart < existEnd AND newEnd > existStart
+      return newStart < existEnd && newEnd > existStart;
+    });
+  }, [meetings]);
+
+  // Open approve modal
+  const openApproveModal = (meeting: Meeting) => {
+    setShowApproveModal(meeting);
+    setApproveFormData({
+      date: meeting.date,
+      startTime: meeting.startTime,
+      endTime: meeting.endTime,
+    });
+  };
+
+  // Get conflicts for the approve modal
+  const approveModalConflicts = useMemo(() => {
+    if (!showApproveModal) return [];
+    return getConflicts(
+      approveFormData.date,
+      approveFormData.startTime,
+      approveFormData.endTime,
+      showApproveModal.departmentId,
+      showApproveModal.id
+    );
+  }, [showApproveModal, approveFormData, getConflicts]);
+
+  // Approve meeting with optional modified date/time
+  const handleApprove = async () => {
+    if (!showApproveModal) return;
+    setProcessingMeetingId(showApproveModal.id);
     try {
       const res = await fetch('/api/meetings', {
         method: 'PATCH',
@@ -163,10 +213,18 @@ export default function MeetingsList({
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ id: meetingId, action: 'approve' }),
+        body: JSON.stringify({
+          id: showApproveModal.id,
+          action: 'approve',
+          // Include modified date/time if changed
+          date: approveFormData.date,
+          startTime: approveFormData.startTime,
+          endTime: approveFormData.endTime,
+        }),
       });
       const data = await res.json();
       if (data.success) {
+        setShowApproveModal(null);
         fetchMeetings();
       } else {
         alert(data.error || 'Failed to approve meeting');
@@ -360,11 +418,11 @@ export default function MeetingsList({
                       </div>
                       <div className="flex gap-2 sm:flex-col">
                         <button
-                          onClick={() => handleApprove(meeting.id)}
+                          onClick={() => openApproveModal(meeting)}
                           disabled={processingMeetingId === meeting.id}
                           className="flex-1 sm:flex-none px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 text-sm"
                         >
-                          {processingMeetingId === meeting.id ? 'Processing...' : 'Approve'}
+                          Review & Approve
                         </button>
                         <button
                           onClick={() => setShowRejectModal(meeting)}
@@ -483,6 +541,7 @@ export default function MeetingsList({
                           key={meeting.id}
                           meeting={meeting}
                           isSuperUser={isSuperUser}
+                          isMyDepartment={adminDepartmentIds.includes(meeting.departmentId)}
                           onEdit={() => handleEdit(meeting)}
                           onDelete={() => handleDelete(meeting.id)}
                           formatTime={formatTime}
@@ -660,6 +719,124 @@ export default function MeetingsList({
           </div>
         </div>
       )}
+
+      {/* Approve Modal with conflict detection */}
+      {showApproveModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">Review & Approve Meeting</h3>
+
+              {/* Meeting Details */}
+              <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                <h4 className="font-semibold text-gray-800">{showApproveModal.title}</h4>
+                <p className="text-sm text-gray-600 mt-1">
+                  Department: <span className="font-medium">{showApproveModal.departmentName}</span>
+                </p>
+                <p className="text-sm text-gray-600">
+                  Requested by: <span className="font-medium">{showApproveModal.requestedByName || 'Unknown'}</span>
+                </p>
+                {showApproveModal.description && (
+                  <p className="text-sm text-gray-600 mt-2">{showApproveModal.description}</p>
+                )}
+              </div>
+
+              {/* Date/Time Form */}
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Date
+                  </label>
+                  <input
+                    type="date"
+                    value={approveFormData.date}
+                    onChange={(e) => setApproveFormData({ ...approveFormData, date: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Start Time
+                    </label>
+                    <input
+                      type="time"
+                      value={approveFormData.startTime}
+                      onChange={(e) => setApproveFormData({ ...approveFormData, startTime: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      End Time
+                    </label>
+                    <input
+                      type="time"
+                      value={approveFormData.endTime}
+                      onChange={(e) => setApproveFormData({ ...approveFormData, endTime: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Conflict Warning */}
+              {approveModalConflicts.length > 0 && (
+                <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4">
+                  <h4 className="text-sm font-semibold text-red-800 flex items-center gap-2">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    Time Conflict Detected ({approveModalConflicts.length})
+                  </h4>
+                  <p className="text-sm text-red-700 mt-1">
+                    The following meetings overlap with the selected time:
+                  </p>
+                  <ul className="mt-2 space-y-1">
+                    {approveModalConflicts.map(conflict => (
+                      <li key={conflict.id} className="text-sm text-red-700">
+                        • <span className="font-medium">{conflict.title}</span> ({formatTime(conflict.startTime)} - {formatTime(conflict.endTime)})
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="text-xs text-red-600 mt-2">
+                    Please adjust the time or date to avoid conflicts.
+                  </p>
+                </div>
+              )}
+
+              {/* No conflicts message */}
+              {approveModalConflicts.length === 0 && (
+                <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-3">
+                  <p className="text-sm text-green-700 flex items-center gap-2">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    No time conflicts detected
+                  </p>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 pt-6">
+                <button
+                  type="button"
+                  onClick={() => setShowApproveModal(null)}
+                  className="px-4 py-2 text-gray-700 hover:text-gray-900"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleApprove}
+                  disabled={processingMeetingId === showApproveModal.id || approveModalConflicts.length > 0}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {processingMeetingId === showApproveModal.id ? 'Approving...' : 'Approve Meeting'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -667,6 +844,7 @@ export default function MeetingsList({
 interface MeetingItemCardProps {
   meeting: Meeting;
   isSuperUser: boolean;
+  isMyDepartment: boolean;
   onEdit: () => void;
   onDelete: () => void;
   formatTime: (time: string) => string;
@@ -675,12 +853,17 @@ interface MeetingItemCardProps {
 function MeetingItemCard({
   meeting,
   isSuperUser,
+  isMyDepartment,
   onEdit,
   onDelete,
   formatTime,
 }: MeetingItemCardProps) {
   return (
-    <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+    <div className={`flex items-start gap-3 p-3 rounded-lg ${
+      isMyDepartment
+        ? 'bg-purple-50 border-l-4 border-purple-500'
+        : 'bg-gray-50'
+    }`}>
       {/* Time column */}
       <div className="flex flex-col items-end w-16 flex-shrink-0">
         <span className="text-sm font-medium text-gray-700">{formatTime(meeting.startTime)}</span>
@@ -689,7 +872,14 @@ function MeetingItemCard({
 
       {/* Meeting details */}
       <div className="flex-1 min-w-0">
-        <h4 className="font-semibold text-gray-800 truncate">{meeting.title}</h4>
+        <div className="flex items-center gap-2 flex-wrap">
+          <h4 className="font-semibold text-gray-800 truncate">{meeting.title}</h4>
+          {isMyDepartment && (
+            <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs font-medium">
+              My Dept
+            </span>
+          )}
+        </div>
         {meeting.departmentName && (
           <span className="inline-block mt-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">
             {meeting.departmentName}
