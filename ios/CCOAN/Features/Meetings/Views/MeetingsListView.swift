@@ -6,8 +6,6 @@ struct MeetingsListView: View {
     @State private var showingCreateMeeting = false
     @State private var editingMeeting: Meeting?
 
-    private let daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
-
     var body: some View {
         VStack(spacing: 0) {
             // Header with filter and create button
@@ -40,20 +38,8 @@ struct MeetingsListView: View {
                     Task { await viewModel.loadData() }
                 }
             } else {
-                ScrollView {
-                    VStack(spacing: 0) {
-                        // Calendar View
-                        calendarView
-                            .padding(.bottom, 16)
-
-                        // Meetings for selected date or all meetings
-                        if let selectedDate = viewModel.selectedDate {
-                            selectedDateMeetingsView(selectedDate)
-                        } else {
-                            allMeetingsView
-                        }
-                    }
-                }
+                // Weekly Calendar View
+                weeklyCalendarView
             }
         }
         .sheet(isPresented: $showingCreateMeeting) {
@@ -70,14 +56,14 @@ struct MeetingsListView: View {
         }
     }
 
-    // MARK: - Calendar View
+    // MARK: - Weekly Calendar View
 
-    private var calendarView: some View {
+    private var weeklyCalendarView: some View {
         VStack(spacing: 0) {
-            // Month navigation
+            // Week navigation
             HStack {
                 Button {
-                    viewModel.goToPreviousMonth()
+                    viewModel.goToPreviousWeek()
                 } label: {
                     Image(systemName: "chevron.left")
                         .font(.title2)
@@ -86,15 +72,14 @@ struct MeetingsListView: View {
                 Spacer()
 
                 VStack {
-                    Text(viewModel.monthYearString)
-                        .font(.title3)
-                        .fontWeight(.semibold)
+                    Text(viewModel.weekRangeString)
+                        .font(.headline)
                 }
 
                 Spacer()
 
                 Button {
-                    viewModel.goToNextMonth()
+                    viewModel.goToNextWeek()
                 } label: {
                     Image(systemName: "chevron.right")
                         .font(.title2)
@@ -102,234 +87,183 @@ struct MeetingsListView: View {
             }
             .padding(.horizontal)
             .padding(.vertical, 12)
+            .background(Color(.systemBackground))
 
             // Today button
             Button("Today") {
-                viewModel.goToCurrentMonth()
-                viewModel.selectedDate = nil
+                viewModel.goToCurrentWeek()
             }
             .font(.caption)
             .padding(.bottom, 8)
+            .background(Color(.systemBackground))
 
-            // Days of week header
-            HStack(spacing: 0) {
-                ForEach(daysOfWeek, id: \.self) { day in
-                    Text(day)
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundColor(day == "Sun" ? .blue : .secondary)
-                        .frame(maxWidth: .infinity)
-                }
-            }
-            .padding(.horizontal, 8)
-            .padding(.bottom, 8)
-
-            // Calendar grid
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 0), count: 7), spacing: 0) {
-                ForEach(viewModel.calendarDays, id: \.self) { date in
-                    CalendarDayCell(
-                        date: date,
-                        isCurrentMonth: viewModel.isCurrentMonth(date),
-                        isToday: viewModel.isToday(date),
-                        isSelected: viewModel.isSelected(date),
-                        hasMeetings: viewModel.hasMeetings(on: date)
-                    )
-                    .onTapGesture {
-                        if viewModel.isCurrentMonth(date) {
-                            if viewModel.isSelected(date) {
-                                viewModel.selectedDate = nil
-                            } else {
-                                viewModel.selectDate(date)
+            // Week days with meetings
+            ScrollView {
+                VStack(spacing: 0) {
+                    ForEach(viewModel.weekDays, id: \.self) { date in
+                        WeekDayRow(
+                            date: date,
+                            meetings: viewModel.meetingsForDate(date),
+                            isToday: viewModel.isToday(date),
+                            isSuperUser: authViewModel.isSuperUser,
+                            viewModel: viewModel,
+                            onEdit: { meeting in editingMeeting = meeting },
+                            onDelete: { meetingId in
+                                Task { await viewModel.deleteMeeting(id: meetingId) }
                             }
-                        }
+                        )
                     }
                 }
             }
-            .padding(.horizontal, 8)
-
-            // Legend
-            HStack(spacing: 16) {
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(Color.blue)
-                        .frame(width: 8, height: 8)
-                    Text("Has meetings")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                }
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(Color.green)
-                        .frame(width: 8, height: 8)
-                    Text("Today")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                }
-            }
-            .padding(.top, 12)
         }
-        .background(Color(.systemBackground))
-    }
-
-    // MARK: - Selected Date Meetings
-
-    private func selectedDateMeetingsView(_ date: Date) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text(formatSelectedDate(date))
-                    .font(.headline)
-
-                Spacer()
-
-                Button("Show All") {
-                    viewModel.selectedDate = nil
-                }
-                .font(.caption)
-            }
-            .padding(.horizontal)
-
-            let meetings = viewModel.meetingsForDate(date)
-            if meetings.isEmpty {
-                VStack(spacing: 8) {
-                    Image(systemName: "calendar.badge.exclamationmark")
-                        .font(.largeTitle)
-                        .foregroundColor(.secondary)
-                    Text("No meetings on this day")
-                        .foregroundColor(.secondary)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 40)
-            } else {
-                ForEach(meetings) { meeting in
-                    MeetingCard(
-                        meeting: meeting,
-                        isSuperUser: authViewModel.isSuperUser,
-                        onEdit: { editingMeeting = meeting },
-                        onDelete: {
-                            Task { await viewModel.deleteMeeting(id: meeting.id) }
-                        }
-                    )
-                    .padding(.horizontal)
-                }
-            }
-        }
-        .padding(.vertical)
-    }
-
-    private func formatSelectedDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "EEEE, MMMM d, yyyy"
-        return formatter.string(from: date)
-    }
-
-    // MARK: - All Meetings View
-
-    private var allMeetingsView: some View {
-        LazyVStack(alignment: .leading, spacing: 16) {
-            // Upcoming meetings
-            if !viewModel.upcomingMeetings.isEmpty {
-                Text("Upcoming")
-                    .font(.headline)
-                    .padding(.horizontal)
-
-                ForEach(viewModel.upcomingMeetings) { meeting in
-                    MeetingCard(
-                        meeting: meeting,
-                        isSuperUser: authViewModel.isSuperUser,
-                        onEdit: { editingMeeting = meeting },
-                        onDelete: {
-                            Task { await viewModel.deleteMeeting(id: meeting.id) }
-                        }
-                    )
-                    .padding(.horizontal)
-                }
-            }
-
-            // Past meetings
-            if !viewModel.pastMeetings.isEmpty {
-                Text("Past")
-                    .font(.headline)
-                    .padding(.horizontal)
-                    .padding(.top, viewModel.upcomingMeetings.isEmpty ? 0 : 16)
-
-                ForEach(viewModel.pastMeetings) { meeting in
-                    MeetingCard(
-                        meeting: meeting,
-                        isSuperUser: authViewModel.isSuperUser,
-                        isPast: true,
-                        onEdit: { editingMeeting = meeting },
-                        onDelete: {
-                            Task { await viewModel.deleteMeeting(id: meeting.id) }
-                        }
-                    )
-                    .padding(.horizontal)
-                }
-            }
-
-            if viewModel.upcomingMeetings.isEmpty && viewModel.pastMeetings.isEmpty {
-                EmptyStateView(
-                    icon: "calendar.badge.exclamationmark",
-                    title: "No Meetings",
-                    message: authViewModel.isSuperUser ?
-                        "Schedule a meeting to get started" :
-                        "No meetings scheduled for your departments"
-                )
-                .padding(.top, 60)
-            }
-        }
-        .padding(.vertical)
     }
 }
 
-// MARK: - Calendar Day Cell
+// MARK: - Week Day Row
 
-struct CalendarDayCell: View {
+struct WeekDayRow: View {
     let date: Date
-    let isCurrentMonth: Bool
+    let meetings: [Meeting]
     let isToday: Bool
-    let isSelected: Bool
-    let hasMeetings: Bool
-
-    private var dayOfMonth: Int {
-        Calendar.current.component(.day, from: date)
-    }
+    let isSuperUser: Bool
+    let viewModel: MeetingsViewModel
+    let onEdit: (Meeting) -> Void
+    let onDelete: (String) -> Void
 
     var body: some View {
-        VStack(spacing: 2) {
-            ZStack {
-                if isToday {
-                    Circle()
-                        .fill(Color.green)
-                        .frame(width: 32, height: 32)
-                } else if isSelected {
-                    Circle()
-                        .fill(Color.blue)
-                        .frame(width: 32, height: 32)
-                } else if hasMeetings && isCurrentMonth {
-                    Circle()
-                        .stroke(Color.blue, lineWidth: 2)
-                        .frame(width: 32, height: 32)
+        VStack(alignment: .leading, spacing: 0) {
+            // Day header
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(viewModel.formatDayHeader(date))
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(isToday ? .white : .secondary)
+                    Text(viewModel.formatDayNumber(date))
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(isToday ? .white : .primary)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(isToday ? Color.green : Color.clear)
+                .cornerRadius(8)
+
+                Spacer()
+
+                if meetings.isEmpty {
+                    Text("No meetings")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .padding(.trailing)
+                }
+            }
+            .padding(.horizontal)
+            .padding(.top, 12)
+            .padding(.bottom, meetings.isEmpty ? 12 : 8)
+
+            // Meetings for this day
+            if !meetings.isEmpty {
+                VStack(spacing: 8) {
+                    ForEach(meetings) { meeting in
+                        MeetingItemCard(
+                            meeting: meeting,
+                            isSuperUser: isSuperUser,
+                            onEdit: { onEdit(meeting) },
+                            onDelete: { onDelete(meeting.id) }
+                        )
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.bottom, 12)
+            }
+
+            Divider()
+                .padding(.leading)
+        }
+        .background(Color(.systemBackground))
+    }
+}
+
+// MARK: - Meeting Item Card (Compact)
+
+struct MeetingItemCard: View {
+    let meeting: Meeting
+    let isSuperUser: Bool
+    let onEdit: () -> Void
+    let onDelete: () -> Void
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            // Time column
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(formatTime(meeting.startTime))
+                    .font(.caption)
+                    .fontWeight(.medium)
+                Text(formatTime(meeting.endTime))
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+            .frame(width: 55)
+
+            // Meeting details
+            VStack(alignment: .leading, spacing: 4) {
+                Text(meeting.title)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .lineLimit(1)
+
+                if let deptName = meeting.departmentName {
+                    Text(deptName)
+                        .font(.caption2)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.blue.opacity(0.1))
+                        .foregroundColor(.blue)
+                        .cornerRadius(4)
                 }
 
-                Text("\(dayOfMonth)")
-                    .font(.subheadline)
-                    .fontWeight(hasMeetings ? .semibold : .regular)
-                    .foregroundColor(
-                        isToday || isSelected ? .white :
-                        !isCurrentMonth ? .gray.opacity(0.3) :
-                        hasMeetings ? .blue : .primary
-                    )
+                if !meeting.location.isEmpty {
+                    HStack(spacing: 2) {
+                        Image(systemName: "mappin")
+                            .font(.caption2)
+                        Text(meeting.location)
+                            .font(.caption2)
+                    }
+                    .foregroundColor(.secondary)
+                }
             }
 
-            if hasMeetings && isCurrentMonth {
-                Circle()
-                    .fill(Color.blue.opacity(0.6))
-                    .frame(width: 4, height: 4)
-            } else {
-                Spacer().frame(height: 4)
+            Spacer()
+
+            if isSuperUser {
+                Menu {
+                    Button { onEdit() } label: {
+                        Label("Edit", systemImage: "pencil")
+                    }
+                    Button(role: .destructive) { onDelete() } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .padding(8)
+                }
             }
         }
-        .frame(height: 44)
+        .padding(12)
+        .background(Color(.secondarySystemBackground))
+        .cornerRadius(10)
+    }
+
+    private func formatTime(_ time: String) -> String {
+        let parts = time.split(separator: ":")
+        guard parts.count >= 2, let hour = Int(parts[0]) else { return time }
+        let minute = parts[1]
+        let ampm = hour >= 12 ? "PM" : "AM"
+        let hour12 = hour % 12 == 0 ? 12 : hour % 12
+        return "\(hour12):\(minute) \(ampm)"
     }
 }
 

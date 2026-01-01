@@ -33,81 +33,75 @@ class MeetingsViewModel @Inject constructor(
     private val _selectedDepartmentId = MutableStateFlow<String?>(null)
     val selectedDepartmentId: StateFlow<String?> = _selectedDepartmentId.asStateFlow()
 
-    // Calendar state
-    private val _displayedMonth = MutableStateFlow(Date())
-    val displayedMonth: StateFlow<Date> = _displayedMonth.asStateFlow()
+    // Calendar state - weekly view
+    private val _currentWeekStart = MutableStateFlow(getWeekStart(Date()))
+    val currentWeekStart: StateFlow<Date> = _currentWeekStart.asStateFlow()
 
-    private val _selectedDate = MutableStateFlow<Date?>(null)
-    val selectedDate: StateFlow<Date?> = _selectedDate.asStateFlow()
-
-    private val _calendarDays = MutableStateFlow<List<Date>>(emptyList())
-    val calendarDays: StateFlow<List<Date>> = _calendarDays.asStateFlow()
+    private val _weekDays = MutableStateFlow<List<Date>>(emptyList())
+    val weekDays: StateFlow<List<Date>> = _weekDays.asStateFlow()
 
     private val calendar = Calendar.getInstance()
 
     init {
-        updateCalendarDays()
+        updateWeekDays()
     }
 
     // MARK: - Calendar Methods
 
-    private fun updateCalendarDays() {
+    private fun getWeekStart(date: Date): Date {
+        val cal = Calendar.getInstance()
+        cal.time = date
+        cal.firstDayOfWeek = Calendar.SUNDAY
+        cal.set(Calendar.DAY_OF_WEEK, Calendar.SUNDAY)
+        cal.set(Calendar.HOUR_OF_DAY, 0)
+        cal.set(Calendar.MINUTE, 0)
+        cal.set(Calendar.SECOND, 0)
+        cal.set(Calendar.MILLISECOND, 0)
+        return cal.time
+    }
+
+    private fun updateWeekDays() {
         val days = mutableListOf<Date>()
         val cal = Calendar.getInstance()
-        cal.time = _displayedMonth.value
+        cal.time = _currentWeekStart.value
 
-        // Go to first day of month
-        cal.set(Calendar.DAY_OF_MONTH, 1)
-
-        // Go back to Sunday of the first week
-        val firstDayOfWeek = cal.get(Calendar.DAY_OF_WEEK)
-        cal.add(Calendar.DAY_OF_MONTH, -(firstDayOfWeek - Calendar.SUNDAY))
-
-        // Generate 42 days (6 weeks)
-        repeat(42) {
+        for (i in 0 until 7) {
             days.add(cal.time)
             cal.add(Calendar.DAY_OF_MONTH, 1)
         }
 
-        _calendarDays.value = days
+        _weekDays.value = days
     }
 
-    fun getMonthYearString(): String {
-        val formatter = SimpleDateFormat("MMMM yyyy", Locale.US)
-        return formatter.format(_displayedMonth.value)
+    fun getWeekRangeString(): String {
+        val days = _weekDays.value
+        if (days.isEmpty()) return ""
+
+        val startFormatter = SimpleDateFormat("MMM d", Locale.US)
+        val endFormatter = SimpleDateFormat("MMM d, yyyy", Locale.US)
+
+        return "${startFormatter.format(days.first())} - ${endFormatter.format(days.last())}"
     }
 
-    fun goToPreviousMonth() {
+    fun goToPreviousWeek() {
         val cal = Calendar.getInstance()
-        cal.time = _displayedMonth.value
-        cal.add(Calendar.MONTH, -1)
-        _displayedMonth.value = cal.time
-        updateCalendarDays()
+        cal.time = _currentWeekStart.value
+        cal.add(Calendar.DAY_OF_MONTH, -7)
+        _currentWeekStart.value = cal.time
+        updateWeekDays()
     }
 
-    fun goToNextMonth() {
+    fun goToNextWeek() {
         val cal = Calendar.getInstance()
-        cal.time = _displayedMonth.value
-        cal.add(Calendar.MONTH, 1)
-        _displayedMonth.value = cal.time
-        updateCalendarDays()
+        cal.time = _currentWeekStart.value
+        cal.add(Calendar.DAY_OF_MONTH, 7)
+        _currentWeekStart.value = cal.time
+        updateWeekDays()
     }
 
-    fun goToCurrentMonth() {
-        _displayedMonth.value = Date()
-        _selectedDate.value = null
-        updateCalendarDays()
-    }
-
-    fun selectDate(date: Date?) {
-        _selectedDate.value = date
-    }
-
-    fun isCurrentMonth(date: Date): Boolean {
-        val displayCal = Calendar.getInstance().apply { time = _displayedMonth.value }
-        val dateCal = Calendar.getInstance().apply { time = date }
-        return displayCal.get(Calendar.MONTH) == dateCal.get(Calendar.MONTH) &&
-                displayCal.get(Calendar.YEAR) == dateCal.get(Calendar.YEAR)
+    fun goToCurrentWeek() {
+        _currentWeekStart.value = getWeekStart(Date())
+        updateWeekDays()
     }
 
     fun isToday(date: Date): Boolean {
@@ -115,20 +109,6 @@ class MeetingsViewModel @Inject constructor(
         val dateCal = Calendar.getInstance().apply { time = date }
         return todayCal.get(Calendar.YEAR) == dateCal.get(Calendar.YEAR) &&
                 todayCal.get(Calendar.DAY_OF_YEAR) == dateCal.get(Calendar.DAY_OF_YEAR)
-    }
-
-    fun isSelected(date: Date): Boolean {
-        val selected = _selectedDate.value ?: return false
-        val selectedCal = Calendar.getInstance().apply { time = selected }
-        val dateCal = Calendar.getInstance().apply { time = date }
-        return selectedCal.get(Calendar.YEAR) == dateCal.get(Calendar.YEAR) &&
-                selectedCal.get(Calendar.DAY_OF_YEAR) == dateCal.get(Calendar.DAY_OF_YEAR)
-    }
-
-    fun hasMeetings(date: Date): Boolean {
-        val dateFormatter = SimpleDateFormat("yyyy-MM-dd", Locale.US)
-        val dateString = dateFormatter.format(date)
-        return getFilteredMeetings().any { it.date == dateString }
     }
 
     fun meetingsForDate(date: Date): List<Meeting> {
@@ -139,8 +119,13 @@ class MeetingsViewModel @Inject constructor(
             .sortedBy { it.startTime }
     }
 
-    fun formatSelectedDate(date: Date): String {
-        val formatter = SimpleDateFormat("EEEE, MMMM d, yyyy", Locale.US)
+    fun formatDayHeader(date: Date): String {
+        val formatter = SimpleDateFormat("EEE", Locale.US)
+        return formatter.format(date)
+    }
+
+    fun formatDayNumber(date: Date): String {
+        val formatter = SimpleDateFormat("d", Locale.US)
         return formatter.format(date)
     }
 
@@ -153,18 +138,6 @@ class MeetingsViewModel @Inject constructor(
         } else {
             _meetings.value
         }
-    }
-
-    fun getUpcomingMeetings(): List<Meeting> {
-        return getFilteredMeetings()
-            .filter { it.isUpcoming }
-            .sortedBy { it.date }
-    }
-
-    fun getPastMeetings(): List<Meeting> {
-        return getFilteredMeetings()
-            .filter { !it.isUpcoming }
-            .sortedByDescending { it.date }
     }
 
     fun loadData() {

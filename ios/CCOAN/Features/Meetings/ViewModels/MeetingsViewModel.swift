@@ -8,76 +8,70 @@ class MeetingsViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var selectedDepartmentId: String?
 
-    // Calendar state
-    @Published var displayedMonth: Date = Date()
+    // Calendar state - weekly view
+    @Published var currentWeekStart: Date = Date()
+    @Published var weekDays: [Date] = []
     @Published var selectedDate: Date?
-    @Published var calendarDays: [Date] = []
 
     private let apiClient = APIClient.shared
     private let calendar = Calendar.current
 
     init() {
-        updateCalendarDays()
+        currentWeekStart = getWeekStart(from: Date())
+        updateWeekDays()
     }
 
     // MARK: - Calendar Methods
 
-    func updateCalendarDays() {
-        var days: [Date] = []
+    private func getWeekStart(from date: Date) -> Date {
         var cal = calendar
         cal.firstWeekday = 1 // Sunday
+        let components = cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: date)
+        return cal.date(from: components) ?? date
+    }
 
-        // Go to first day of month
-        var components = cal.dateComponents([.year, .month], from: displayedMonth)
-        components.day = 1
-        guard let firstOfMonth = cal.date(from: components) else { return }
-
-        // Go back to Sunday of the first week
-        let firstWeekday = cal.component(.weekday, from: firstOfMonth)
-        guard let startDate = cal.date(byAdding: .day, value: -(firstWeekday - 1), to: firstOfMonth) else { return }
-
-        // Generate 42 days (6 weeks)
-        for i in 0..<42 {
-            if let date = cal.date(byAdding: .day, value: i, to: startDate) {
+    func updateWeekDays() {
+        var days: [Date] = []
+        for i in 0..<7 {
+            if let date = calendar.date(byAdding: .day, value: i, to: currentWeekStart) {
                 days.append(date)
             }
         }
-
-        calendarDays = days
+        weekDays = days
     }
 
-    var monthYearString: String {
+    var weekRangeString: String {
+        guard let firstDay = weekDays.first, let lastDay = weekDays.last else { return "" }
         let formatter = DateFormatter()
-        formatter.dateFormat = "MMMM yyyy"
-        return formatter.string(from: displayedMonth)
+        formatter.dateFormat = "MMM d"
+        let startStr = formatter.string(from: firstDay)
+        formatter.dateFormat = "MMM d, yyyy"
+        let endStr = formatter.string(from: lastDay)
+        return "\(startStr) - \(endStr)"
     }
 
-    func goToPreviousMonth() {
-        if let newDate = calendar.date(byAdding: .month, value: -1, to: displayedMonth) {
-            displayedMonth = newDate
-            updateCalendarDays()
+    func goToPreviousWeek() {
+        if let newStart = calendar.date(byAdding: .day, value: -7, to: currentWeekStart) {
+            currentWeekStart = newStart
+            updateWeekDays()
         }
     }
 
-    func goToNextMonth() {
-        if let newDate = calendar.date(byAdding: .month, value: 1, to: displayedMonth) {
-            displayedMonth = newDate
-            updateCalendarDays()
+    func goToNextWeek() {
+        if let newStart = calendar.date(byAdding: .day, value: 7, to: currentWeekStart) {
+            currentWeekStart = newStart
+            updateWeekDays()
         }
     }
 
-    func goToCurrentMonth() {
-        displayedMonth = Date()
-        updateCalendarDays()
+    func goToCurrentWeek() {
+        currentWeekStart = getWeekStart(from: Date())
+        updateWeekDays()
+        selectedDate = nil
     }
 
-    func selectDate(_ date: Date) {
+    func selectDate(_ date: Date?) {
         selectedDate = date
-    }
-
-    func isCurrentMonth(_ date: Date) -> Bool {
-        calendar.component(.month, from: date) == calendar.component(.month, from: displayedMonth) &&
-        calendar.component(.year, from: date) == calendar.component(.year, from: displayedMonth)
     }
 
     func isToday(_ date: Date) -> Bool {
@@ -89,18 +83,29 @@ class MeetingsViewModel: ObservableObject {
         return calendar.isDate(date, inSameDayAs: selected)
     }
 
-    func hasMeetings(on date: Date) -> Bool {
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd"
-        let dateString = dateFormatter.string(from: date)
-        return filteredMeetings.contains { $0.date == dateString }
-    }
-
     func meetingsForDate(_ date: Date) -> [Meeting] {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd"
         let dateString = dateFormatter.string(from: date)
         return filteredMeetings.filter { $0.date == dateString }.sorted { $0.startTime < $1.startTime }
+    }
+
+    func formatDayHeader(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEE"
+        return formatter.string(from: date)
+    }
+
+    func formatDayNumber(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "d"
+        return formatter.string(from: date)
+    }
+
+    func formatFullDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEE, MMMM d, yyyy"
+        return formatter.string(from: date)
     }
 
     // MARK: - Filtering

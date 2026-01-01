@@ -23,11 +23,8 @@ export default function MeetingsList({
   const [editingMeeting, setEditingMeeting] = useState<Meeting | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
 
-  // Calendar state
-  const [displayedMonth, setDisplayedMonth] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-
-  const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  // Weekly calendar state
+  const [currentWeekStart, setCurrentWeekStart] = useState<Date>(() => getWeekStart(new Date()));
 
   const fetchMeetings = useCallback(async () => {
     setLoading(true);
@@ -71,69 +68,53 @@ export default function MeetingsList({
     fetchMeetings();
   }, [fetchMeetings, refreshTrigger]);
 
-  // Calendar helpers
-  const calendarDays = useMemo(() => {
+  // Week helpers
+  function getWeekStart(date: Date): Date {
+    const d = new Date(date);
+    const day = d.getDay(); // 0 = Sunday
+    d.setDate(d.getDate() - day);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+
+  const weekDays = useMemo(() => {
     const days: Date[] = [];
-    const year = displayedMonth.getFullYear();
-    const month = displayedMonth.getMonth();
-
-    // First day of month
-    const firstOfMonth = new Date(year, month, 1);
-    // Go back to Sunday
-    const startDate = new Date(firstOfMonth);
-    startDate.setDate(startDate.getDate() - firstOfMonth.getDay());
-
-    // Generate 42 days (6 weeks)
-    for (let i = 0; i < 42; i++) {
-      const date = new Date(startDate);
-      date.setDate(startDate.getDate() + i);
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(currentWeekStart);
+      date.setDate(currentWeekStart.getDate() + i);
       days.push(date);
     }
-
     return days;
-  }, [displayedMonth]);
+  }, [currentWeekStart]);
 
-  const monthYearString = useMemo(() => {
-    return displayedMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-  }, [displayedMonth]);
+  const weekRangeString = useMemo(() => {
+    if (weekDays.length === 0) return '';
+    const first = weekDays[0];
+    const last = weekDays[6];
+    const startStr = first.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const endStr = last.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return `${startStr} - ${endStr}`;
+  }, [weekDays]);
 
-  const goToPreviousMonth = () => {
-    setDisplayedMonth(new Date(displayedMonth.getFullYear(), displayedMonth.getMonth() - 1, 1));
+  const goToPreviousWeek = () => {
+    const newStart = new Date(currentWeekStart);
+    newStart.setDate(newStart.getDate() - 7);
+    setCurrentWeekStart(newStart);
   };
 
-  const goToNextMonth = () => {
-    setDisplayedMonth(new Date(displayedMonth.getFullYear(), displayedMonth.getMonth() + 1, 1));
+  const goToNextWeek = () => {
+    const newStart = new Date(currentWeekStart);
+    newStart.setDate(newStart.getDate() + 7);
+    setCurrentWeekStart(newStart);
   };
 
-  const goToCurrentMonth = () => {
-    setDisplayedMonth(new Date());
-    setSelectedDate(null);
-  };
-
-  const isCurrentMonth = (date: Date) => {
-    return date.getMonth() === displayedMonth.getMonth() &&
-           date.getFullYear() === displayedMonth.getFullYear();
+  const goToCurrentWeek = () => {
+    setCurrentWeekStart(getWeekStart(new Date()));
   };
 
   const isToday = (date: Date) => {
     const today = new Date();
     return date.toDateString() === today.toDateString();
-  };
-
-  const isSelected = (date: Date) => {
-    return selectedDate ? date.toDateString() === selectedDate.toDateString() : false;
-  };
-
-  const hasMeetings = (date: Date) => {
-    const dateString = formatDateString(date);
-    return meetings.some(m => m.date === dateString);
-  };
-
-  const meetingsForDate = (date: Date) => {
-    const dateString = formatDateString(date);
-    return meetings
-      .filter(m => m.date === dateString)
-      .sort((a, b) => a.startTime.localeCompare(b.startTime));
   };
 
   const formatDateString = (date: Date) => {
@@ -143,13 +124,19 @@ export default function MeetingsList({
     return `${year}-${month}-${day}`;
   };
 
-  const formatSelectedDateDisplay = (date: Date) => {
-    return date.toLocaleDateString('en-US', {
-      weekday: 'long',
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric'
-    });
+  const meetingsForDate = (date: Date) => {
+    const dateString = formatDateString(date);
+    return meetings
+      .filter(m => m.date === dateString)
+      .sort((a, b) => a.startTime.localeCompare(b.startTime));
+  };
+
+  const formatDayHeader = (date: Date) => {
+    return date.toLocaleDateString('en-US', { weekday: 'short' });
+  };
+
+  const formatDayNumber = (date: Date) => {
+    return date.getDate().toString();
   };
 
   const handleDelete = async (meetingId: string) => {
@@ -204,17 +191,6 @@ export default function MeetingsList({
     }
   };
 
-  const formatDate = (date: string) => {
-    if (!date) return 'No date';
-    const d = new Date(date + 'T00:00:00');
-    return d.toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  };
-
   const formatTime = (time: string) => {
     if (!time) return 'N/A';
     const [hours, minutes] = time.split(':');
@@ -224,17 +200,8 @@ export default function MeetingsList({
     return `${hour12}:${minutes} ${ampm}`;
   };
 
-  const isUpcoming = (date: string) => {
-    if (!date) return false;
-    const meetingDate = new Date(date + 'T23:59:59');
-    return meetingDate >= new Date();
-  };
-
-  const upcomingMeetings = meetings.filter(m => isUpcoming(m.date));
-  const pastMeetings = meetings.filter(m => !isUpcoming(m.date));
-
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header with filters and create button */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-4">
@@ -264,12 +231,11 @@ export default function MeetingsList({
         <div className="text-center py-8 text-gray-500">Loading meetings...</div>
       ) : (
         <>
-          {/* Calendar View */}
+          {/* Week Navigation */}
           <div className="bg-white rounded-lg shadow p-4">
-            {/* Month Navigation */}
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-2">
               <button
-                onClick={goToPreviousMonth}
+                onClick={goToPreviousWeek}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -277,16 +243,16 @@ export default function MeetingsList({
                 </svg>
               </button>
               <div className="text-center">
-                <h3 className="text-lg font-semibold text-gray-800">{monthYearString}</h3>
+                <h3 className="text-lg font-semibold text-gray-800">{weekRangeString}</h3>
                 <button
-                  onClick={goToCurrentMonth}
+                  onClick={goToCurrentWeek}
                   className="text-sm text-blue-600 hover:text-blue-700"
                 >
                   Today
                 </button>
               </div>
               <button
-                onClick={goToNextMonth}
+                onClick={goToNextWeek}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -294,163 +260,56 @@ export default function MeetingsList({
                 </svg>
               </button>
             </div>
-
-            {/* Days of Week Header */}
-            <div className="grid grid-cols-7 gap-1 mb-2">
-              {daysOfWeek.map(day => (
-                <div
-                  key={day}
-                  className={`text-center text-sm font-semibold py-2 ${
-                    day === 'Sun' ? 'text-blue-600' : 'text-gray-600'
-                  }`}
-                >
-                  {day}
-                </div>
-              ))}
-            </div>
-
-            {/* Calendar Grid */}
-            <div className="grid grid-cols-7 gap-1">
-              {calendarDays.map((date, index) => {
-                const inMonth = isCurrentMonth(date);
-                const today = isToday(date);
-                const selected = isSelected(date);
-                const hasMtg = hasMeetings(date);
-
-                return (
-                  <button
-                    key={index}
-                    onClick={() => {
-                      if (inMonth) {
-                        setSelectedDate(selected ? null : date);
-                      }
-                    }}
-                    disabled={!inMonth}
-                    className={`
-                      aspect-square p-1 rounded-lg flex flex-col items-center justify-center
-                      transition-colors relative
-                      ${!inMonth ? 'text-gray-300 cursor-default' : 'cursor-pointer hover:bg-gray-100'}
-                      ${today ? 'bg-green-500 text-white hover:bg-green-600' : ''}
-                      ${selected && !today ? 'bg-blue-500 text-white hover:bg-blue-600' : ''}
-                      ${hasMtg && inMonth && !today && !selected ? 'ring-2 ring-blue-500 ring-inset' : ''}
-                    `}
-                  >
-                    <span className={`text-sm ${hasMtg && inMonth ? 'font-semibold' : ''} ${hasMtg && inMonth && !today && !selected ? 'text-blue-600' : ''}`}>
-                      {date.getDate()}
-                    </span>
-                    {hasMtg && inMonth && (
-                      <span className={`w-1 h-1 rounded-full mt-0.5 ${today || selected ? 'bg-white' : 'bg-blue-500'}`} />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Legend */}
-            <div className="flex items-center justify-center gap-6 mt-4 text-xs text-gray-500">
-              <div className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-blue-500" />
-                <span>Has meetings</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-green-500" />
-                <span>Today</span>
-              </div>
-            </div>
           </div>
 
-          {/* Meetings List */}
-          {selectedDate ? (
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-lg font-medium text-gray-700">
-                  {formatSelectedDateDisplay(selectedDate)}
-                </h3>
-                <button
-                  onClick={() => setSelectedDate(null)}
-                  className="text-sm text-blue-600 hover:text-blue-700"
-                >
-                  Show All
-                </button>
-              </div>
-              {meetingsForDate(selectedDate).length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  No meetings on this day
-                </div>
-              ) : (
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {meetingsForDate(selectedDate).map(meeting => (
-                    <MeetingCard
-                      key={meeting.id}
-                      meeting={meeting}
-                      isSuperUser={isSuperUser}
-                      onEdit={handleEdit}
-                      onDelete={handleDelete}
-                      formatDate={formatDate}
-                      formatTime={formatTime}
-                      isUpcoming={true}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : meetings.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-gray-500">No meetings scheduled</p>
-              {isSuperUser && (
-                <button
-                  onClick={onCreateMeeting}
-                  className="mt-4 text-blue-600 hover:text-blue-700"
-                >
-                  Schedule your first meeting
-                </button>
-              )}
-            </div>
-          ) : (
-            <>
-              {/* Upcoming Meetings */}
-              {upcomingMeetings.length > 0 && (
-                <div>
-                  <h3 className="text-lg font-medium text-gray-700 mb-3">Upcoming Meetings</h3>
-                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    {upcomingMeetings.map(meeting => (
-                      <MeetingCard
-                        key={meeting.id}
-                        meeting={meeting}
-                        isSuperUser={isSuperUser}
-                        onEdit={handleEdit}
-                        onDelete={handleDelete}
-                        formatDate={formatDate}
-                        formatTime={formatTime}
-                        isUpcoming={true}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
+          {/* Weekly Calendar */}
+          <div className="space-y-2">
+            {weekDays.map((date, index) => {
+              const dayMeetings = meetingsForDate(date);
+              const today = isToday(date);
 
-              {/* Past Meetings */}
-              {pastMeetings.length > 0 && (
-                <div>
-                  <h3 className="text-lg font-medium text-gray-500 mb-3">Past Meetings</h3>
-                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    {pastMeetings.map(meeting => (
-                      <MeetingCard
-                        key={meeting.id}
-                        meeting={meeting}
-                        isSuperUser={isSuperUser}
-                        onEdit={handleEdit}
-                        onDelete={handleDelete}
-                        formatDate={formatDate}
-                        formatTime={formatTime}
-                        isUpcoming={false}
-                      />
-                    ))}
+              return (
+                <div key={index} className="bg-white rounded-lg shadow">
+                  {/* Day Header */}
+                  <div className="flex items-center p-4 border-b">
+                    <div
+                      className={`flex flex-col items-center justify-center px-3 py-2 rounded-lg mr-4 ${
+                        today ? 'bg-green-500 text-white' : ''
+                      }`}
+                    >
+                      <span className={`text-xs font-medium ${today ? 'text-white' : 'text-gray-500'}`}>
+                        {formatDayHeader(date)}
+                      </span>
+                      <span className={`text-xl font-bold ${today ? 'text-white' : 'text-gray-800'}`}>
+                        {formatDayNumber(date)}
+                      </span>
+                    </div>
+                    <div className="flex-1">
+                      {dayMeetings.length === 0 && (
+                        <span className="text-sm text-gray-400">No meetings</span>
+                      )}
+                    </div>
                   </div>
+
+                  {/* Meetings for this day */}
+                  {dayMeetings.length > 0 && (
+                    <div className="p-4 space-y-3">
+                      {dayMeetings.map(meeting => (
+                        <MeetingItemCard
+                          key={meeting.id}
+                          meeting={meeting}
+                          isSuperUser={isSuperUser}
+                          onEdit={() => handleEdit(meeting)}
+                          onDelete={() => handleDelete(meeting.id)}
+                          formatTime={formatTime}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
-              )}
-            </>
-          )}
+              );
+            })}
+          </div>
         </>
       )}
 
@@ -576,80 +435,71 @@ export default function MeetingsList({
   );
 }
 
-interface MeetingCardProps {
+interface MeetingItemCardProps {
   meeting: Meeting;
   isSuperUser: boolean;
-  onEdit: (meeting: Meeting) => void;
-  onDelete: (meetingId: string) => void;
-  formatDate: (date: string) => string;
+  onEdit: () => void;
+  onDelete: () => void;
   formatTime: (time: string) => string;
-  isUpcoming: boolean;
 }
 
-function MeetingCard({
+function MeetingItemCard({
   meeting,
   isSuperUser,
   onEdit,
   onDelete,
-  formatDate,
   formatTime,
-  isUpcoming,
-}: MeetingCardProps) {
+}: MeetingItemCardProps) {
   return (
-    <div className={`bg-white rounded-lg shadow p-4 ${!isUpcoming ? 'opacity-60' : ''}`}>
-      <div className="flex justify-between items-start mb-2">
-        <h4 className="font-semibold text-gray-800">{meeting.title}</h4>
-        {isSuperUser && (
-          <div className="flex gap-2">
-            <button
-              onClick={() => onEdit(meeting)}
-              className="text-blue-500 hover:text-blue-700 text-sm"
-            >
-              Edit
-            </button>
-            <button
-              onClick={() => onDelete(meeting.id)}
-              className="text-red-500 hover:text-red-700 text-sm"
-            >
-              Delete
-            </button>
-          </div>
-        )}
+    <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+      {/* Time column */}
+      <div className="flex flex-col items-end w-16 flex-shrink-0">
+        <span className="text-sm font-medium text-gray-700">{formatTime(meeting.startTime)}</span>
+        <span className="text-xs text-gray-400">{formatTime(meeting.endTime)}</span>
       </div>
 
-      <div className="space-y-2 text-sm">
-        <div className="flex items-center gap-2 text-gray-600">
-          <span className="font-medium">Date:</span>
-          <span>{formatDate(meeting.date)}</span>
-        </div>
-
-        <div className="flex items-center gap-2 text-gray-600">
-          <span className="font-medium">Time:</span>
-          <span>{formatTime(meeting.startTime)} - {formatTime(meeting.endTime)}</span>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <span className="font-medium text-gray-600">Department:</span>
-          <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">
+      {/* Meeting details */}
+      <div className="flex-1 min-w-0">
+        <h4 className="font-semibold text-gray-800 truncate">{meeting.title}</h4>
+        {meeting.departmentName && (
+          <span className="inline-block mt-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">
             {meeting.departmentName}
           </span>
-        </div>
-
+        )}
         {meeting.location && (
-          <div className="flex items-center gap-2 text-gray-600">
-            <span className="font-medium">Location:</span>
-            <span>{meeting.location}</span>
+          <div className="flex items-center gap-1 mt-1 text-xs text-gray-500">
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <span className="truncate">{meeting.location}</span>
           </div>
         )}
-
-        {meeting.description && (
-          <p className="text-gray-600 mt-2 pt-2 border-t">{meeting.description}</p>
-        )}
-
-        <div className="text-xs text-gray-400 mt-2">
-          Scheduled by: {meeting.creatorName}
-        </div>
       </div>
+
+      {/* Actions */}
+      {isSuperUser && (
+        <div className="flex gap-1 flex-shrink-0">
+          <button
+            onClick={onEdit}
+            className="p-1 text-blue-500 hover:text-blue-700"
+            title="Edit"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+          </button>
+          <button
+            onClick={onDelete}
+            className="p-1 text-red-500 hover:text-red-700"
+            title="Delete"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
+        </div>
+      )}
     </div>
   );
 }
