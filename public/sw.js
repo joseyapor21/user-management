@@ -26,6 +26,7 @@ self.addEventListener('push', function(event) {
     body: body,
     icon: '/icon-192.png',
     badge: '/badge-72.png',
+    image: '/icon-512.png',
     tag: data.tag || 'default',
     requireInteraction: true,
     vibrate: [200, 100, 200],
