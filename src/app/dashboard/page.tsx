@@ -78,6 +78,9 @@ export default function DashboardPage() {
 
   // Meetings state
   const [showCreateMeetingModal, setShowCreateMeetingModal] = useState(false);
+
+  // Department search state
+  const [departmentSearch, setDepartmentSearch] = useState('');
   const [meetingsRefreshTrigger, setMeetingsRefreshTrigger] = useState(0);
 
   const fetchData = useCallback(async () => {
@@ -627,9 +630,21 @@ export default function DashboardPage() {
             {/* Departments Tab */}
             {activeTab === 'departments' && (
               <div>
-                {/* Refresh button for non-superusers */}
+                {/* Search and Refresh for non-superusers */}
                 {!user.isSuperUser && (
-                  <div className="mb-4 flex justify-end">
+                  <div className="mb-4 flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                      <input
+                        type="text"
+                        value={departmentSearch}
+                        onChange={(e) => setDepartmentSearch(e.target.value)}
+                        placeholder="Search departments..."
+                        className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
+                      />
+                    </div>
                     <button
                       onClick={fetchData}
                       className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md"
@@ -667,9 +682,21 @@ export default function DashboardPage() {
                       </div>
                     ) : (
                       <div className="flex items-center gap-2">
+                        <div className="relative flex-1">
+                          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                          </svg>
+                          <input
+                            type="text"
+                            value={departmentSearch}
+                            onChange={(e) => setDepartmentSearch(e.target.value)}
+                            placeholder="Search departments..."
+                            className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
+                          />
+                        </div>
                         <button
                           onClick={() => setShowNewDeptForm(true)}
-                          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+                          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 whitespace-nowrap"
                         >
                           + New Department
                         </button>
@@ -687,26 +714,42 @@ export default function DashboardPage() {
                   </div>
                 )}
 
-                {departments.length === 0 ? (
-                  <p className="text-gray-500 text-center py-8">No departments found</p>
-                ) : (
-                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    {departments.map((dept) => (
-                      <DepartmentCard
-                        key={dept.id}
-                        department={dept}
-                        token={token!}
-                        isSuperUser={user.isSuperUser}
-                        currentUserId={user.id}
-                        onAddAdmin={() => openUserModal(dept, 'admin')}
-                        onAddMember={() => openUserModal(dept, 'member')}
-                        onRemoveAdmin={(userId) => handleRemoveAdmin(dept.id, userId)}
-                        onRemoveMember={(userId) => handleRemoveMember(dept.id, userId)}
-                        onDelete={() => deleteDepartment(dept.id)}
-                      />
-                    ))}
-                  </div>
-                )}
+                {(() => {
+                  const filteredDepartments = departments.filter(dept =>
+                    dept.name.toLowerCase().includes(departmentSearch.toLowerCase())
+                  );
+
+                  if (departments.length === 0) {
+                    return <p className="text-gray-500 text-center py-8">No departments found</p>;
+                  }
+
+                  if (filteredDepartments.length === 0) {
+                    return (
+                      <p className="text-gray-500 text-center py-8">
+                        No departments matching &quot;{departmentSearch}&quot;
+                      </p>
+                    );
+                  }
+
+                  return (
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                      {filteredDepartments.map((dept) => (
+                        <DepartmentCard
+                          key={dept.id}
+                          department={dept}
+                          token={token!}
+                          isSuperUser={user.isSuperUser}
+                          currentUserId={user.id}
+                          onAddAdmin={() => openUserModal(dept, 'admin')}
+                          onAddMember={() => openUserModal(dept, 'member')}
+                          onRemoveAdmin={(userId) => handleRemoveAdmin(dept.id, userId)}
+                          onRemoveMember={(userId) => handleRemoveMember(dept.id, userId)}
+                          onDelete={() => deleteDepartment(dept.id)}
+                        />
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
             )}
 
