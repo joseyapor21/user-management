@@ -128,20 +128,26 @@ export async function GET(request: NextRequest) {
 
     // Build query based on filters
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let query: any;
+    const query: any = {};
 
+    // Filter by department or all accessible departments
     if (departmentId) {
       // Check if user has access to this department
       if (!accessibleDepts.includes(departmentId)) {
         return NextResponse.json({ error: 'Access denied to this department' }, { status: 403 });
       }
-      query = { departmentId };
-    } else if (assignedToMe) {
-      // Show only tasks assigned to the user
-      query = { assigneeId: userInfo.userId };
+      query.departmentId = departmentId;
     } else {
       // Show tasks from all accessible departments
-      query = { departmentId: { $in: accessibleDepts } };
+      query.departmentId = { $in: accessibleDepts };
+    }
+
+    // Filter by assigned to me (check both assigneeId and assigneeIds)
+    if (assignedToMe) {
+      query.$or = [
+        { assigneeId: userInfo.userId },
+        { assigneeIds: userInfo.userId }
+      ];
     }
 
     // Filter by archived status

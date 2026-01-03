@@ -7,7 +7,10 @@ interface SundayScheduleProps {
   token: string;
   isSuperUser: boolean;
   departments: Department[];
+  currentUserName: string;
 }
+
+type ScheduleViewTab = 'all' | 'my-posts';
 
 interface ScheduleData {
   id?: string;
@@ -51,7 +54,7 @@ function formatDateForApi(date: Date): string {
   return date.toISOString().split('T')[0];
 }
 
-export default function SundaySchedule({ token, isSuperUser, departments }: SundayScheduleProps) {
+export default function SundaySchedule({ token, isSuperUser, departments, currentUserName }: SundayScheduleProps) {
   const [selectedDate, setSelectedDate] = useState<Date>(getNextSunday(new Date()));
   const [schedule, setSchedule] = useState<ScheduleData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -61,6 +64,9 @@ export default function SundaySchedule({ token, isSuperUser, departments }: Sund
   const [scheduleAdminName, setScheduleAdminName] = useState<string | null>(null);
   const [editingCell, setEditingCell] = useState<{ phase: string; dept: string } | null>(null);
   const [cellValue, setCellValue] = useState('');
+
+  // Tab state for All Posts vs My Posts
+  const [viewTab, setViewTab] = useState<ScheduleViewTab>('all');
 
   // Admin management state (for SuperUser)
   const [showAdminModal, setShowAdminModal] = useState(false);
@@ -93,6 +99,14 @@ export default function SundaySchedule({ token, isSuperUser, departments }: Sund
     const slot = schedule.slots.find(s => s.phase === phase && s.department === dept);
     return slot?.assignees || '';
   }, [schedule]);
+
+  // Get all cells where the current user appears
+  const getMyPosts = useCallback(() => {
+    if (!schedule?.slots || !currentUserName) return [];
+    return schedule.slots.filter(slot =>
+      slot.assignees && slot.assignees.toLowerCase().includes(currentUserName.toLowerCase())
+    );
+  }, [schedule, currentUserName]);
 
   // Fetch schedule for selected date
   const fetchSchedule = useCallback(async () => {
@@ -671,7 +685,79 @@ export default function SundaySchedule({ token, isSuperUser, departments }: Sund
         )}
       </div>
 
-      {/* Schedule Grid */}
+      {/* View Tabs */}
+      <div className="bg-white rounded-lg shadow-sm p-1 flex gap-1">
+        <button
+          onClick={() => setViewTab('all')}
+          className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+            viewTab === 'all'
+              ? 'bg-blue-600 text-white'
+              : 'text-gray-600 hover:bg-gray-100'
+          }`}
+        >
+          All Posts
+        </button>
+        <button
+          onClick={() => setViewTab('my-posts')}
+          className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+            viewTab === 'my-posts'
+              ? 'bg-blue-600 text-white'
+              : 'text-gray-600 hover:bg-gray-100'
+          }`}
+        >
+          My Posts
+        </button>
+      </div>
+
+      {/* My Posts View */}
+      {viewTab === 'my-posts' && (
+        <div className="bg-white rounded-lg shadow-sm p-4">
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">
+            My Assignments for {formatDate(selectedDate)}
+          </h3>
+          {(() => {
+            const myPosts = getMyPosts();
+            if (myPosts.length === 0) {
+              return (
+                <div className="text-center py-8 text-gray-500">
+                  <svg className="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                  <p>No assignments found for this Sunday</p>
+                  <p className="text-sm text-gray-400 mt-1">Check the &quot;All Posts&quot; tab to see the full schedule</p>
+                </div>
+              );
+            }
+            return (
+              <div className="space-y-3">
+                {myPosts.map((slot, index) => (
+                  <div
+                    key={index}
+                    className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded">
+                            {slot.phase}
+                          </span>
+                          <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded">
+                            {slot.department}
+                          </span>
+                        </div>
+                        <p className="text-gray-800 mt-2 whitespace-pre-wrap">{slot.assignees}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* Schedule Grid (All Posts) */}
+      {viewTab === 'all' && (
       <div className="bg-white rounded-lg shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full border-collapse">
@@ -809,6 +895,7 @@ export default function SundaySchedule({ token, isSuperUser, departments }: Sund
           </table>
         </div>
       </div>
+      )}
 
       {/* Legend / Help - Only shown to admins who can edit */}
       {canEdit && (
