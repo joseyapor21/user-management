@@ -1001,10 +1001,28 @@ export default function TaskModal({
                       </span>
                     </div>
                     <div>
-                      <span className="text-gray-500">Assignee:</span>
-                      <span className="ml-2 font-medium text-gray-800">
-                        {project.assigneeName || 'Unassigned'}
-                      </span>
+                      <span className="text-gray-500">Assignee{project.assigneeIds && project.assigneeIds.length > 1 ? 's' : ''}:</span>
+                      {project.assigneeIds && project.assigneeIds.length > 1 ? (
+                        <div className="ml-2 mt-1">
+                          <div className="flex flex-wrap gap-2">
+                            {project.assigneeNames?.map((name, idx) => (
+                              <div
+                                key={project.assigneeIds?.[idx] || idx}
+                                className="flex items-center gap-1.5 bg-blue-50 text-blue-700 px-2 py-1 rounded-full text-sm"
+                              >
+                                <div className="w-5 h-5 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-medium">
+                                  {name.charAt(0).toUpperCase()}
+                                </div>
+                                <span className="font-medium">{name}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="ml-2 font-medium text-gray-800">
+                          {project.assigneeName || 'Unassigned'}
+                        </span>
+                      )}
                     </div>
                     <div>
                       <span className="text-gray-500">Due Date:</span>
