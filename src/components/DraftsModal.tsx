@@ -41,6 +41,11 @@ export default function DraftsModal({
     return dept?.adminIds?.includes(userId) || false;
   }, [isSuperUser, departments, userId]);
 
+  // Get department IDs where user is admin
+  const adminDepartmentIds = isSuperUser
+    ? departments.map(d => d.id)
+    : departments.filter(d => d.adminIds?.includes(userId)).map(d => d.id);
+
   // Fetch archived tasks
   const fetchArchivedTasks = useCallback(async () => {
     setLoading(true);
@@ -50,14 +55,18 @@ export default function DraftsModal({
       });
       const data = await res.json();
       if (data.success) {
-        setArchivedTasks(data.data || []);
+        // Filter to only show drafts from departments where user is admin
+        const filteredTasks = (data.data || []).filter(
+          (task: Project) => adminDepartmentIds.includes(task.departmentId)
+        );
+        setArchivedTasks(filteredTasks);
       }
     } catch (error) {
       console.error('Error fetching archived tasks:', error);
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, adminDepartmentIds]);
 
   useEffect(() => {
     fetchArchivedTasks();
