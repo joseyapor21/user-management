@@ -21,11 +21,6 @@ interface UserOption {
   email: string;
 }
 
-interface SelectedUser {
-  id: string;
-  name: string;
-}
-
 interface ScheduleConfig {
   departments: string[];
   phases: string[];
@@ -74,10 +69,8 @@ export default function SundaySchedule({ token, isSuperUser, departments }: Sund
   const [savingAdmin, setSavingAdmin] = useState(false);
 
   // Cell editing with user selector
-  const [selectedUsers, setSelectedUsers] = useState<SelectedUser[]>([]);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [userSearchQuery, setUserSearchQuery] = useState('');
-  const [manualText, setManualText] = useState('');
 
   // Auto-refresh state
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
@@ -308,53 +301,8 @@ export default function SundaySchedule({ token, isSuperUser, departments }: Sund
     const currentValue = getSlotValue(phase, dept);
     setCellValue(currentValue);
     setUserSearchQuery('');
-
-    // Parse existing assignees to pre-select users and extract manual text
-    if (currentValue) {
-      const names = currentValue.split(/[,\n]/).map(n => n.trim()).filter(Boolean);
-      const matched: SelectedUser[] = [];
-      const unmatched: string[] = [];
-      names.forEach(name => {
-        const user = users.find(u => u.name.toLowerCase() === name.toLowerCase());
-        if (user) {
-          matched.push({ id: user.id, name: user.name });
-        } else {
-          unmatched.push(name);
-        }
-      });
-      setSelectedUsers(matched);
-      setManualText(unmatched.join(', '));
-    } else {
-      setSelectedUsers([]);
-      setManualText('');
-    }
     setShowUserDropdown(false);
   };
-
-  // Toggle user selection
-  const toggleUserSelection = (user: UserOption) => {
-    setSelectedUsers(prev => {
-      const exists = prev.find(u => u.id === user.id);
-      if (exists) {
-        return prev.filter(u => u.id !== user.id);
-      }
-      return [...prev, { id: user.id, name: user.name }];
-    });
-  };
-
-  // Update cell value when selected users or manual text change
-  const updateCellFromUsers = useCallback(() => {
-    const userNames = selectedUsers.map(u => u.name);
-    const manualNames = manualText.split(/[,\n]/).map(n => n.trim()).filter(Boolean);
-    const allNames = [...userNames, ...manualNames].filter(Boolean);
-    setCellValue(allNames.join(', '));
-  }, [selectedUsers, manualText]);
-
-  useEffect(() => {
-    if (editingCell) {
-      updateCellFromUsers();
-    }
-  }, [selectedUsers, manualText, editingCell, updateCellFromUsers]);
 
   // Save cell edit
   const saveCell = async () => {
@@ -405,10 +353,8 @@ export default function SundaySchedule({ token, isSuperUser, departments }: Sund
   const cancelEditing = () => {
     setEditingCell(null);
     setCellValue('');
-    setSelectedUsers([]);
     setShowUserDropdown(false);
     setUserSearchQuery('');
-    setManualText('');
   };
 
   if (loading) {
@@ -764,37 +710,30 @@ export default function SundaySchedule({ token, isSuperUser, departments }: Sund
                       >
                         {isEditing ? (
                           <div className="relative" onClick={(e) => e.stopPropagation()}>
-                            {/* Selected users display */}
-                            <div className="min-h-[40px] p-1 bg-white border border-blue-400 rounded text-gray-900">
-                              <div className="flex flex-wrap gap-1 mb-1">
-                                {selectedUsers.map((u) => (
-                                  <span
-                                    key={u.id}
-                                    className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-xs"
-                                  >
-                                    {u.name}
-                                    <button
-                                      type="button"
-                                      onClick={() => toggleUserSelection({ id: u.id, name: u.name, email: '' })}
-                                      className="text-blue-600 hover:text-blue-800"
-                                    >
-                                      &times;
-                                    </button>
-                                  </span>
-                                ))}
-                              </div>
+                            {/* Free-form text area */}
+                            <textarea
+                              value={cellValue}
+                              onChange={(e) => setCellValue(e.target.value)}
+                              placeholder="Enter text (e.g., BREAKDOWN: GEORGIA/LISA)"
+                              className="w-full min-w-[200px] px-2 py-1 text-xs border border-blue-400 rounded bg-white text-gray-900 resize-none"
+                              rows={3}
+                              autoFocus
+                            />
+
+                            {/* Quick add user button */}
+                            <div className="mt-1">
                               <button
                                 type="button"
                                 onClick={() => setShowUserDropdown(!showUserDropdown)}
                                 className="text-xs text-blue-600 hover:text-blue-800"
                               >
-                                + Add user
+                                + Quick add user
                               </button>
                             </div>
 
                             {/* User dropdown with search */}
                             {showUserDropdown && (
-                              <div className="absolute left-0 top-full mt-1 w-56 bg-white border border-gray-300 rounded-md shadow-lg z-20">
+                              <div className="absolute left-0 mt-1 w-56 bg-white border border-gray-300 rounded-md shadow-lg z-20">
                                 {/* Search input */}
                                 <div className="p-2 border-b">
                                   <input
@@ -803,7 +742,6 @@ export default function SundaySchedule({ token, isSuperUser, departments }: Sund
                                     onChange={(e) => setUserSearchQuery(e.target.value)}
                                     placeholder="Search users..."
                                     className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900"
-                                    autoFocus
                                   />
                                 </div>
                                 <div className="max-h-32 overflow-y-auto">
@@ -818,46 +756,26 @@ export default function SundaySchedule({ token, isSuperUser, departments }: Sund
                                       if (filteredUsers.length === 0) {
                                         return <div className="p-2 text-xs text-gray-500">No users matching &quot;{userSearchQuery}&quot;</div>;
                                       }
-                                      return filteredUsers.map((user) => {
-                                        const isSelected = selectedUsers.some(u => u.id === user.id);
-                                        return (
-                                          <button
-                                            key={user.id}
-                                            type="button"
-                                            onClick={() => toggleUserSelection(user)}
-                                            className={`w-full text-left px-3 py-2 text-xs hover:bg-gray-100 flex items-center gap-2 ${
-                                              isSelected ? 'bg-blue-50 text-blue-800' : 'text-gray-700'
-                                            }`}
-                                          >
-                                            <span className={`w-4 h-4 border rounded flex items-center justify-center ${
-                                              isSelected ? 'bg-blue-600 border-blue-600' : 'border-gray-300'
-                                            }`}>
-                                              {isSelected && (
-                                                <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                                </svg>
-                                              )}
-                                            </span>
-                                            {user.name}
-                                          </button>
-                                        );
-                                      });
+                                      return filteredUsers.map((user) => (
+                                        <button
+                                          key={user.id}
+                                          type="button"
+                                          onClick={() => {
+                                            // Append user name to cell value
+                                            setCellValue(prev => prev ? `${prev} ${user.name}` : user.name);
+                                            setShowUserDropdown(false);
+                                            setUserSearchQuery('');
+                                          }}
+                                          className="w-full text-left px-3 py-2 text-xs hover:bg-gray-100 text-gray-700"
+                                        >
+                                          {user.name}
+                                        </button>
+                                      ));
                                     })()
                                   )}
                                 </div>
                               </div>
                             )}
-
-                            {/* Manual text input */}
-                            <div className="mt-2">
-                              <input
-                                type="text"
-                                value={manualText}
-                                onChange={(e) => setManualText(e.target.value)}
-                                placeholder="Or type names manually..."
-                                className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900"
-                              />
-                            </div>
 
                             {/* Action buttons */}
                             <div className="flex gap-1 mt-1">
