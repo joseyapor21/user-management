@@ -76,6 +76,12 @@ export default function SundaySchedule({ token, isSuperUser, departments }: Sund
   // Cell editing with user selector
   const [selectedUsers, setSelectedUsers] = useState<SelectedUser[]>([]);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
+  const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [manualText, setManualText] = useState('');
+
+  // Auto-refresh state
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
+  const AUTO_REFRESH_INTERVAL = 30000; // 30 seconds
 
   // Schedule configuration (custom departments and phases)
   const [config, setConfig] = useState<ScheduleConfig>({
@@ -128,6 +134,17 @@ export default function SundaySchedule({ token, isSuperUser, departments }: Sund
   useEffect(() => {
     fetchSchedule();
   }, [fetchSchedule]);
+
+  // Auto-refresh effect
+  useEffect(() => {
+    if (!autoRefreshEnabled || editingCell) return;
+
+    const interval = setInterval(() => {
+      fetchSchedule();
+    }, AUTO_REFRESH_INTERVAL);
+
+    return () => clearInterval(interval);
+  }, [autoRefreshEnabled, editingCell, fetchSchedule]);
 
   // Fetch department members for user selection
   const fetchUsers = useCallback(async () => {
@@ -290,20 +307,26 @@ export default function SundaySchedule({ token, isSuperUser, departments }: Sund
     setEditingCell({ phase, dept });
     const currentValue = getSlotValue(phase, dept);
     setCellValue(currentValue);
+    setUserSearchQuery('');
 
-    // Parse existing assignees to pre-select users
+    // Parse existing assignees to pre-select users and extract manual text
     if (currentValue) {
       const names = currentValue.split(/[,\n]/).map(n => n.trim()).filter(Boolean);
       const matched: SelectedUser[] = [];
+      const unmatched: string[] = [];
       names.forEach(name => {
         const user = users.find(u => u.name.toLowerCase() === name.toLowerCase());
         if (user) {
           matched.push({ id: user.id, name: user.name });
+        } else {
+          unmatched.push(name);
         }
       });
       setSelectedUsers(matched);
+      setManualText(unmatched.join(', '));
     } else {
       setSelectedUsers([]);
+      setManualText('');
     }
     setShowUserDropdown(false);
   };
@@ -319,17 +342,19 @@ export default function SundaySchedule({ token, isSuperUser, departments }: Sund
     });
   };
 
-  // Update cell value when selected users change
+  // Update cell value when selected users or manual text change
   const updateCellFromUsers = useCallback(() => {
-    const names = selectedUsers.map(u => u.name).join(', ');
-    setCellValue(names);
-  }, [selectedUsers]);
+    const userNames = selectedUsers.map(u => u.name);
+    const manualNames = manualText.split(/[,\n]/).map(n => n.trim()).filter(Boolean);
+    const allNames = [...userNames, ...manualNames].filter(Boolean);
+    setCellValue(allNames.join(', '));
+  }, [selectedUsers, manualText]);
 
   useEffect(() => {
     if (editingCell) {
       updateCellFromUsers();
     }
-  }, [selectedUsers, editingCell, updateCellFromUsers]);
+  }, [selectedUsers, manualText, editingCell, updateCellFromUsers]);
 
   // Save cell edit
   const saveCell = async () => {
@@ -382,6 +407,8 @@ export default function SundaySchedule({ token, isSuperUser, departments }: Sund
     setCellValue('');
     setSelectedUsers([]);
     setShowUserDropdown(false);
+    setUserSearchQuery('');
+    setManualText('');
   };
 
   if (loading) {
@@ -640,6 +667,22 @@ export default function SundaySchedule({ token, isSuperUser, departments }: Sund
               </svg>
             </button>
 
+            {/* Auto-refresh toggle */}
+            <button
+              onClick={() => setAutoRefreshEnabled(!autoRefreshEnabled)}
+              className={`px-3 py-2 text-sm rounded-md flex items-center gap-1 ${
+                autoRefreshEnabled
+                  ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+              }`}
+              title={autoRefreshEnabled ? 'Auto-refresh enabled (30s)' : 'Auto-refresh disabled'}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className="hidden sm:inline">{autoRefreshEnabled ? 'Auto' : 'Manual'}</span>
+            </button>
+
             {/* Config buttons for admins */}
             {canEdit && (
               <>
@@ -749,39 +792,72 @@ export default function SundaySchedule({ token, isSuperUser, departments }: Sund
                               </button>
                             </div>
 
-                            {/* User dropdown */}
+                            {/* User dropdown with search */}
                             {showUserDropdown && (
-                              <div className="absolute left-0 top-full mt-1 w-48 max-h-40 overflow-y-auto bg-white border border-gray-300 rounded-md shadow-lg z-20">
-                                {users.length === 0 ? (
-                                  <div className="p-2 text-xs text-gray-500">No users available</div>
-                                ) : (
-                                  users.map((user) => {
-                                    const isSelected = selectedUsers.some(u => u.id === user.id);
-                                    return (
-                                      <button
-                                        key={user.id}
-                                        type="button"
-                                        onClick={() => toggleUserSelection(user)}
-                                        className={`w-full text-left px-3 py-2 text-xs hover:bg-gray-100 flex items-center gap-2 ${
-                                          isSelected ? 'bg-blue-50 text-blue-800' : 'text-gray-700'
-                                        }`}
-                                      >
-                                        <span className={`w-4 h-4 border rounded flex items-center justify-center ${
-                                          isSelected ? 'bg-blue-600 border-blue-600' : 'border-gray-300'
-                                        }`}>
-                                          {isSelected && (
-                                            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                            </svg>
-                                          )}
-                                        </span>
-                                        {user.name}
-                                      </button>
-                                    );
-                                  })
-                                )}
+                              <div className="absolute left-0 top-full mt-1 w-56 bg-white border border-gray-300 rounded-md shadow-lg z-20">
+                                {/* Search input */}
+                                <div className="p-2 border-b">
+                                  <input
+                                    type="text"
+                                    value={userSearchQuery}
+                                    onChange={(e) => setUserSearchQuery(e.target.value)}
+                                    placeholder="Search users..."
+                                    className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900"
+                                    autoFocus
+                                  />
+                                </div>
+                                <div className="max-h-32 overflow-y-auto">
+                                  {users.length === 0 ? (
+                                    <div className="p-2 text-xs text-gray-500">No users available</div>
+                                  ) : (
+                                    (() => {
+                                      const filteredUsers = users.filter(user =>
+                                        user.name.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
+                                        user.email.toLowerCase().includes(userSearchQuery.toLowerCase())
+                                      );
+                                      if (filteredUsers.length === 0) {
+                                        return <div className="p-2 text-xs text-gray-500">No users matching &quot;{userSearchQuery}&quot;</div>;
+                                      }
+                                      return filteredUsers.map((user) => {
+                                        const isSelected = selectedUsers.some(u => u.id === user.id);
+                                        return (
+                                          <button
+                                            key={user.id}
+                                            type="button"
+                                            onClick={() => toggleUserSelection(user)}
+                                            className={`w-full text-left px-3 py-2 text-xs hover:bg-gray-100 flex items-center gap-2 ${
+                                              isSelected ? 'bg-blue-50 text-blue-800' : 'text-gray-700'
+                                            }`}
+                                          >
+                                            <span className={`w-4 h-4 border rounded flex items-center justify-center ${
+                                              isSelected ? 'bg-blue-600 border-blue-600' : 'border-gray-300'
+                                            }`}>
+                                              {isSelected && (
+                                                <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                </svg>
+                                              )}
+                                            </span>
+                                            {user.name}
+                                          </button>
+                                        );
+                                      });
+                                    })()
+                                  )}
+                                </div>
                               </div>
                             )}
+
+                            {/* Manual text input */}
+                            <div className="mt-2">
+                              <input
+                                type="text"
+                                value={manualText}
+                                onChange={(e) => setManualText(e.target.value)}
+                                placeholder="Or type names manually..."
+                                className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900"
+                              />
+                            </div>
 
                             {/* Action buttons */}
                             <div className="flex gap-1 mt-1">
