@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Project, ProjectStatus, Department, Priority, CustomColumn } from '@/types';
+import { useRealtimeUpdates } from '@/hooks/useRealtimeUpdates';
 import KanbanColumn from './KanbanColumn';
 import TaskModal from './TaskModal';
 import CreateTaskModal from './CreateTaskModal';
@@ -93,63 +94,35 @@ export default function KanbanBoard({ token, departments, userId, userName, isSu
     fetchProjects();
   }, [fetchProjects]);
 
-  // Poll for updates every 10 seconds (only when tab is visible)
-  useEffect(() => {
-    let intervalId: NodeJS.Timeout | null = null;
-
-    const startPolling = () => {
-      if (intervalId) return;
-      intervalId = setInterval(() => {
-        // Silent fetch - don't show loading state
-        fetch('/api/projects' + (selectedDepartment !== 'all' ? `?departmentId=${selectedDepartment}` : '') + (viewMode === 'assigned' ? `${selectedDepartment !== 'all' ? '&' : '?'}assignedToMe=true` : ''), {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-          .then(res => res.json())
-          .then(data => {
-            if (data.success) {
-              setProjects(data.data);
-              // Update selected project if it's open
-              if (selectedProject) {
-                const updated = data.data.find((p: Project) => p.id === selectedProject.id);
-                if (updated) {
-                  setSelectedProject(updated);
-                }
-              }
+  // Real-time updates - refresh when other tabs/windows make changes
+  const { triggerUpdate } = useRealtimeUpdates({
+    onProjectUpdate: useCallback(() => {
+      fetchProjects().then(() => {
+        // Update selected project if it's open
+        if (selectedProject) {
+          setProjects(prev => {
+            const updated = prev.find((p: Project) => p.id === selectedProject.id);
+            if (updated) {
+              setSelectedProject(updated);
             }
-          })
-          .catch(() => {}); // Silent fail for polling
-      }, 10000); // 10 seconds
-    };
+            return prev;
+          });
+        }
+      });
+    }, [fetchProjects, selectedProject]),
+  });
 
-    const stopPolling = () => {
-      if (intervalId) {
-        clearInterval(intervalId);
-        intervalId = null;
-      }
-    };
-
+  // Refresh when tab becomes visible
+  useEffect(() => {
     const handleVisibilityChange = () => {
-      if (document.hidden) {
-        stopPolling();
-      } else {
-        // Fetch immediately when tab becomes visible, then start polling
+      if (!document.hidden) {
         fetchProjects();
-        startPolling();
       }
     };
-
-    // Start polling if tab is visible
-    if (!document.hidden) {
-      startPolling();
-    }
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      stopPolling();
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [token, selectedDepartment, viewMode, selectedProject, fetchProjects]);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [fetchProjects]);
 
   // Fetch custom columns when department changes
   const fetchColumns = useCallback(async (deptId: string) => {
@@ -338,6 +311,8 @@ export default function KanbanBoard({ token, departments, userId, userName, isSu
             }),
           }).catch(() => {});
         }
+        // Broadcast update to other tabs/windows
+        triggerUpdate('project_update');
       } else {
         // Revert on error
         showError('Failed to move task');
@@ -359,6 +334,7 @@ export default function KanbanBoard({ token, departments, userId, userName, isSu
   const handleTaskCreated = () => {
     setShowCreateModal(false);
     fetchProjects();
+    triggerUpdate('project_update');
   };
 
   const handleTaskUpdated = async (keepModalOpen = false) => {
@@ -398,6 +374,9 @@ export default function KanbanBoard({ token, departments, userId, userName, isSu
         } else {
           setSelectedProject(null);
         }
+
+        // Broadcast update to other tabs/windows
+        triggerUpdate('project_update');
       }
     } catch (err) {
       console.error('Error fetching projects:', err);

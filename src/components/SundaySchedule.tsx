@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { ScheduleSlot, SERVICE_PHASES, SCHEDULE_DEPARTMENTS, User, Department } from '@/types';
+import { useRealtimeUpdates } from '@/hooks/useRealtimeUpdates';
 
 interface SundayScheduleProps {
   token: string;
@@ -78,10 +79,6 @@ export default function SundaySchedule({ token, isSuperUser, departments, curren
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [userSearchQuery, setUserSearchQuery] = useState('');
 
-  // Auto-refresh state
-  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
-  const AUTO_REFRESH_INTERVAL = 30000; // 30 seconds
-
   // Schedule configuration (custom departments and phases)
   const [config, setConfig] = useState<ScheduleConfig>({
     departments: [...SCHEDULE_DEPARTMENTS],
@@ -154,16 +151,10 @@ export default function SundaySchedule({ token, isSuperUser, departments, curren
     fetchSchedule();
   }, [fetchSchedule]);
 
-  // Auto-refresh effect
-  useEffect(() => {
-    if (!autoRefreshEnabled || editingCell) return;
-
-    const interval = setInterval(() => {
-      fetchSchedule();
-    }, AUTO_REFRESH_INTERVAL);
-
-    return () => clearInterval(interval);
-  }, [autoRefreshEnabled, editingCell, fetchSchedule]);
+  // Real-time updates - refresh when other tabs/windows make changes
+  const { triggerUpdate } = useRealtimeUpdates({
+    onScheduleUpdate: fetchSchedule,
+  });
 
   // Fetch department members for user selection
   const fetchUsers = useCallback(async () => {
@@ -368,6 +359,8 @@ export default function SundaySchedule({ token, isSuperUser, departments, curren
           slots: newSlots,
         }),
       });
+      // Broadcast update to all connected clients
+      triggerUpdate('schedule_update', { date: schedule.date });
     } catch (error) {
       console.error('Error saving schedule:', error);
     } finally {
@@ -639,21 +632,14 @@ export default function SundaySchedule({ token, isSuperUser, departments, curren
               </svg>
             </button>
 
-            {/* Auto-refresh toggle */}
-            <button
-              onClick={() => setAutoRefreshEnabled(!autoRefreshEnabled)}
-              className={`px-3 py-2 text-sm rounded-md flex items-center gap-1 ${
-                autoRefreshEnabled
-                  ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-              }`}
-              title={autoRefreshEnabled ? 'Auto-refresh enabled (30s)' : 'Auto-refresh disabled'}
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span className="hidden sm:inline">{autoRefreshEnabled ? 'Auto' : 'Manual'}</span>
-            </button>
+            {/* Live indicator */}
+            <div className="px-3 py-2 text-sm rounded-md flex items-center gap-1.5 bg-green-100 text-green-700" title="Real-time updates active">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+              </span>
+              <span className="hidden sm:inline">Live</span>
+            </div>
 
             {/* Config buttons for admins */}
             {canEdit && (
