@@ -151,7 +151,18 @@ export default function SundaySchedule({ token, isSuperUser, departments, curren
     fetchSchedule();
   }, [fetchSchedule]);
 
-  // Real-time updates - refresh when other tabs/windows make changes
+  // Auto-refresh every 30 seconds when not editing
+  useEffect(() => {
+    if (editingCell) return;
+
+    const interval = setInterval(() => {
+      fetchSchedule();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [editingCell, fetchSchedule]);
+
+  // Cross-tab updates
   const { triggerUpdate } = useRealtimeUpdates({
     onScheduleUpdate: fetchSchedule,
   });

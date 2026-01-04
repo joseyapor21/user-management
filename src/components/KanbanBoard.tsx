@@ -94,22 +94,34 @@ export default function KanbanBoard({ token, departments, userId, userName, isSu
     fetchProjects();
   }, [fetchProjects]);
 
-  // Real-time updates - refresh when other tabs/windows make changes
-  const { triggerUpdate } = useRealtimeUpdates({
-    onProjectUpdate: useCallback(() => {
-      fetchProjects().then(() => {
-        // Update selected project if it's open
-        if (selectedProject) {
-          setProjects(prev => {
-            const updated = prev.find((p: Project) => p.id === selectedProject.id);
-            if (updated) {
-              setSelectedProject(updated);
+  // Auto-refresh every 15 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // Silent refresh
+      fetch('/api/projects' + (selectedDepartment !== 'all' ? `?departmentId=${selectedDepartment}` : '') + (viewMode === 'assigned' ? `${selectedDepartment !== 'all' ? '&' : '?'}assignedToMe=true` : ''), {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            setProjects(data.data);
+            if (selectedProject) {
+              const updated = data.data.find((p: Project) => p.id === selectedProject.id);
+              if (updated) {
+                setSelectedProject(updated);
+              }
             }
-            return prev;
-          });
-        }
-      });
-    }, [fetchProjects, selectedProject]),
+          }
+        })
+        .catch(() => {});
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, [token, selectedDepartment, viewMode, selectedProject]);
+
+  // Cross-tab updates
+  const { triggerUpdate } = useRealtimeUpdates({
+    onProjectUpdate: fetchProjects,
   });
 
   // Refresh when tab becomes visible
