@@ -1,5 +1,17 @@
+// Icon Generator Script
+// Run: npm install canvas --save-dev && node scripts/generate-icons.js
+// Note: canvas package is only needed when regenerating icons, not for build
+
 const fs = require('fs');
-const { createCanvas } = require('canvas');
+
+let createCanvas;
+try {
+  createCanvas = require('canvas').createCanvas;
+} catch (e) {
+  console.error('Error: canvas package not installed.');
+  console.error('Run: npm install canvas --save-dev');
+  process.exit(1);
+}
 
 // Icon sizes needed for iOS and Android
 const sizes = [
