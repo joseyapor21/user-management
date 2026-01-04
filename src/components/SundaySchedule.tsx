@@ -151,18 +151,7 @@ export default function SundaySchedule({ token, isSuperUser, departments, curren
     fetchSchedule();
   }, [fetchSchedule]);
 
-  // Auto-refresh every 30 seconds when not editing
-  useEffect(() => {
-    if (editingCell) return;
-
-    const interval = setInterval(() => {
-      fetchSchedule();
-    }, 30000);
-
-    return () => clearInterval(interval);
-  }, [editingCell, fetchSchedule]);
-
-  // Cross-tab updates
+  // Real-time updates via Pusher (like Google Docs)
   const { triggerUpdate } = useRealtimeUpdates({
     onScheduleUpdate: fetchSchedule,
   });

@@ -94,34 +94,19 @@ export default function KanbanBoard({ token, departments, userId, userName, isSu
     fetchProjects();
   }, [fetchProjects]);
 
-  // Auto-refresh every 15 seconds
-  useEffect(() => {
-    const interval = setInterval(() => {
-      // Silent refresh
-      fetch('/api/projects' + (selectedDepartment !== 'all' ? `?departmentId=${selectedDepartment}` : '') + (viewMode === 'assigned' ? `${selectedDepartment !== 'all' ? '&' : '?'}assignedToMe=true` : ''), {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-        .then(res => res.json())
-        .then(data => {
-          if (data.success) {
-            setProjects(data.data);
-            if (selectedProject) {
-              const updated = data.data.find((p: Project) => p.id === selectedProject.id);
-              if (updated) {
-                setSelectedProject(updated);
-              }
-            }
-          }
-        })
-        .catch(() => {});
-    }, 15000);
-
-    return () => clearInterval(interval);
-  }, [token, selectedDepartment, viewMode, selectedProject]);
-
-  // Cross-tab updates
+  // Real-time updates via Pusher (like Google Docs)
   const { triggerUpdate } = useRealtimeUpdates({
-    onProjectUpdate: fetchProjects,
+    onProjectUpdate: useCallback(() => {
+      fetchProjects().then(() => {
+        if (selectedProject) {
+          setProjects(prev => {
+            const updated = prev.find((p: Project) => p.id === selectedProject.id);
+            if (updated) setSelectedProject(updated);
+            return prev;
+          });
+        }
+      });
+    }, [fetchProjects, selectedProject]),
   });
 
   // Refresh when tab becomes visible
