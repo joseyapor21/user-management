@@ -100,13 +100,25 @@ export default function SundaySchedule({ token, isSuperUser, departments, curren
     return slot?.assignees || '';
   }, [schedule]);
 
-  // Get all cells where the current user appears
+  // Get all cells where the current user appears (sorted by phase order)
   const getMyPosts = useCallback(() => {
     if (!schedule?.slots || !currentUserName) return [];
-    return schedule.slots.filter(slot =>
+    const filtered = schedule.slots.filter(slot =>
       slot.assignees && slot.assignees.toLowerCase().includes(currentUserName.toLowerCase())
     );
-  }, [schedule, currentUserName]);
+    // Sort by phase order (as defined in config.phases)
+    return filtered.sort((a, b) => {
+      const phaseIndexA = config.phases.indexOf(a.phase);
+      const phaseIndexB = config.phases.indexOf(b.phase);
+      if (phaseIndexA !== phaseIndexB) {
+        return phaseIndexA - phaseIndexB;
+      }
+      // If same phase, sort by department order
+      const deptIndexA = config.departments.indexOf(a.department);
+      const deptIndexB = config.departments.indexOf(b.department);
+      return deptIndexA - deptIndexB;
+    });
+  }, [schedule, currentUserName, config.phases, config.departments]);
 
   // Fetch schedule for selected date
   const fetchSchedule = useCallback(async () => {
