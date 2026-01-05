@@ -908,6 +908,22 @@ function MeetingItemCard({
                 {meeting.departmentName}
               </span>
             )}
+            {/* Attendee indicator */}
+            {meeting.allMembers ? (
+              <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs flex items-center gap-1">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+                All Members
+              </span>
+            ) : meeting.attendeeNames && meeting.attendeeNames.length > 0 ? (
+              <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs flex items-center gap-1">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                {meeting.attendeeNames.length} attendee{meeting.attendeeNames.length !== 1 ? 's' : ''}
+              </span>
+            ) : null}
             {meeting.location && (
               <span className="flex items-center gap-1 text-xs text-gray-500">
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -985,6 +1001,37 @@ function MeetingItemCard({
                 <span className="text-gray-500">Location:</span>
                 <span className="ml-2 font-medium text-gray-800">{meeting.location}</span>
               </div>
+            )}
+          </div>
+
+          {/* Attendees */}
+          <div>
+            <h5 className="text-xs font-medium text-gray-500 uppercase mb-2">Attendees</h5>
+            {meeting.allMembers ? (
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                  All Department Members
+                </span>
+              </div>
+            ) : meeting.attendeeNames && meeting.attendeeNames.length > 0 ? (
+              <div className="flex flex-wrap gap-1">
+                {meeting.attendeeNames.map((name, idx) => (
+                  <span
+                    key={idx}
+                    className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-xs"
+                  >
+                    <span className="w-4 h-4 rounded-full bg-blue-500 text-white flex items-center justify-center text-[10px] font-medium">
+                      {name.charAt(0).toUpperCase()}
+                    </span>
+                    {name}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400 italic">No attendees specified</p>
             )}
           </div>
 

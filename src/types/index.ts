@@ -210,6 +210,10 @@ export interface Meeting {
   rejectedByName?: string;
   rejectedAt?: string;
   rejectionReason?: string;
+  // Attendees
+  allMembers?: boolean;  // If true, all department members are invited
+  attendeeIds?: string[];  // Specific attendee user IDs
+  attendeeNames?: string[];  // Attendee names for display
   metadata: {
     createdAt: string;
     updatedAt: string;

@@ -79,26 +79,35 @@ async function notifySuperUsers(title: string, body: string, url: string = '/das
   await sendPushToUsers(superUserIds, title, body, url);
 }
 
-// Send push notification to department members
+// Send push notification to meeting attendees
 async function sendMeetingNotification(
   departmentId: string,
   departmentName: string,
   title: string,
   date: string,
   startTime: string,
-  notificationType: NotificationType = 'new'
+  notificationType: NotificationType = 'new',
+  allMembers: boolean = true,
+  attendeeIds: string[] = []
 ) {
   const db = await getDatabase();
 
-  // Get department to find all members
-  const department = await db.collection(DEPARTMENTS_COLLECTION).findOne({
-    _id: new ObjectId(departmentId)
-  });
+  let userIds: string[] = [];
 
-  if (!department) return;
+  if (allMembers) {
+    // Get department to find all members
+    const department = await db.collection(DEPARTMENTS_COLLECTION).findOne({
+      _id: new ObjectId(departmentId)
+    });
 
-  // Get all user IDs in the department (admins + members)
-  const userIds = [...(department.adminIds || []), ...(department.memberIds || [])];
+    if (!department) return;
+
+    // Get all user IDs in the department (admins + members)
+    userIds = [...(department.adminIds || []), ...(department.memberIds || [])];
+  } else {
+    // Only notify specific attendees
+    userIds = attendeeIds;
+  }
 
   if (userIds.length === 0) return;
 
@@ -278,7 +287,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { title, description, date, startTime, endTime, departmentId, location } = body;
+    const { title, description, date, startTime, endTime, departmentId, location, allMembers = true, attendeeIds = [] } = body;
 
     if (!title || !title.trim()) {
       return NextResponse.json({ error: 'Meeting title is required' }, { status: 400 });
@@ -317,6 +326,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized - Must be SuperUser or Department Admin' }, { status: 403 });
     }
 
+    // Get attendee names if specific attendees are selected
+    let attendeeNames: string[] = [];
+    if (!allMembers && attendeeIds.length > 0) {
+      const attendees = await db.collection(USERS_COLLECTION).find({
+        _id: { $in: attendeeIds.map((id: string) => new ObjectId(id)) }
+      }).toArray();
+      attendeeNames = attendees.map(u => u.name || u.email);
+    }
+
     // SuperUsers create approved meetings, Department Admins create pending requests
     const meetingStatus = userInfo.isSuperUser ? 'approved' : 'pending';
 
@@ -331,6 +349,9 @@ export async function POST(request: NextRequest) {
       createdBy: userInfo.userId,
       status: meetingStatus,
       reminderSent: false,
+      allMembers,
+      attendeeIds: allMembers ? [] : attendeeIds,
+      attendeeNames: allMembers ? [] : attendeeNames,
       metadata: {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -348,14 +369,16 @@ export async function POST(request: NextRequest) {
     // Send push notifications
     try {
       if (meetingStatus === 'approved') {
-        // Notify department members of new approved meeting
+        // Notify attendees of new approved meeting
         await sendMeetingNotification(
           departmentId,
           department.name,
           title.trim(),
           date,
           startTime,
-          'new'
+          'new',
+          allMembers,
+          attendeeIds
         );
       } else {
         // Notify superusers of new meeting request
@@ -460,7 +483,7 @@ export async function PATCH(request: NextRequest) {
         );
       }
 
-      // Notify department members
+      // Notify attendees
       if (department) {
         await sendMeetingNotification(
           meeting.departmentId,
@@ -468,7 +491,9 @@ export async function PATCH(request: NextRequest) {
           meeting.title,
           finalDate,
           finalStartTime,
-          'new'
+          'new',
+          meeting.allMembers !== false,
+          meeting.attendeeIds || []
         );
       }
 
@@ -521,7 +546,7 @@ export async function PUT(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { id, title, description, date, startTime, endTime, departmentId, location } = body;
+    const { id, title, description, date, startTime, endTime, departmentId, location, allMembers = true, attendeeIds = [] } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'Meeting ID is required' }, { status: 400 });
@@ -557,6 +582,15 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Department not found' }, { status: 404 });
     }
 
+    // Get attendee names if specific attendees are selected
+    let attendeeNames: string[] = [];
+    if (!allMembers && attendeeIds.length > 0) {
+      const attendees = await db.collection(USERS_COLLECTION).find({
+        _id: { $in: attendeeIds.map((id: string) => new ObjectId(id)) }
+      }).toArray();
+      attendeeNames = attendees.map(u => u.name || u.email);
+    }
+
     await db.collection(COLLECTION_NAME).updateOne(
       { _id: new ObjectId(id) },
       {
@@ -568,13 +602,16 @@ export async function PUT(request: NextRequest) {
           endTime,
           departmentId,
           location: location?.trim() || '',
+          allMembers,
+          attendeeIds: allMembers ? [] : attendeeIds,
+          attendeeNames: allMembers ? [] : attendeeNames,
           reminderSent: false, // Reset reminder when meeting is updated
           'metadata.updatedAt': new Date().toISOString(),
         },
       }
     );
 
-    // Send push notification about the update to all department members
+    // Send push notification about the update to attendees
     try {
       await sendMeetingNotification(
         departmentId,
@@ -582,7 +619,9 @@ export async function PUT(request: NextRequest) {
         title.trim(),
         date,
         startTime,
-        'updated'
+        'updated',
+        allMembers,
+        attendeeIds
       );
     } catch (notifError) {
       console.error('Failed to send meeting update notification:', notifError);

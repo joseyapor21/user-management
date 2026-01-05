@@ -101,15 +101,24 @@ export async function GET(request: NextRequest) {
     let remindersSent = 0;
 
     for (const meeting of meetings) {
-      // Get department info
-      const department = await db.collection(DEPARTMENTS_COLLECTION).findOne({
-        _id: new ObjectId(meeting.departmentId)
-      });
+      // Determine who should receive notifications
+      let userIds: string[] = [];
 
-      if (!department) continue;
+      if (meeting.allMembers !== false) {
+        // Get department info
+        const department = await db.collection(DEPARTMENTS_COLLECTION).findOne({
+          _id: new ObjectId(meeting.departmentId)
+        });
 
-      // Get all user IDs in the department
-      const userIds = [...(department.adminIds || []), ...(department.memberIds || [])];
+        if (!department) continue;
+
+        // Get all user IDs in the department
+        userIds = [...(department.adminIds || []), ...(department.memberIds || [])];
+      } else {
+        // Only notify specific attendees
+        userIds = meeting.attendeeIds || [];
+      }
+
       if (userIds.length === 0) continue;
 
       // Get all push subscriptions for these users
