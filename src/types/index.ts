@@ -256,3 +256,62 @@ export interface Project {
     updatedAt: string;
   };
 }
+
+// Support Ticket types
+export type TicketType = 'bug' | 'feature' | 'question' | 'other';
+export type TicketStatus = 'open' | 'in_progress' | 'resolved' | 'closed';
+export type TicketPriority = 'low' | 'medium' | 'high' | 'urgent';
+
+export interface TicketResponse {
+  id: string;
+  userId: string;
+  userName: string;
+  message: string;
+  isAdmin: boolean;
+  createdAt: string;
+}
+
+export interface Ticket {
+  id: string;
+  _id?: string;
+  type: TicketType;
+  title: string;
+  description: string;
+  screenshots: string[];  // URLs to uploaded images
+  status: TicketStatus;
+  priority: TicketPriority;
+  submittedBy: string;
+  submittedByName?: string;
+  submittedByEmail?: string;
+  assignedTo?: string;
+  assignedToName?: string;
+  responses: TicketResponse[];
+  resolvedAt?: string;
+  resolvedBy?: string;
+  resolvedByName?: string;
+  metadata: {
+    createdAt: string;
+    updatedAt: string;
+  };
+}
+
+// User activity for SuperUser dashboard
+export interface UserActivity {
+  userId: string;
+  userName: string;
+  userEmail: string;
+  departments: {
+    id: string;
+    name: string;
+    role: 'admin' | 'member';
+  }[];
+  currentTasks: {
+    id: string;
+    title: string;
+    status: string;
+    departmentName: string;
+    priority: string;
+  }[];
+  completedTasksCount: number;
+  lastActive?: string;
+}
