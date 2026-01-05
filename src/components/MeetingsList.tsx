@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Meeting, Department } from '@/types';
+import { Meeting, Department, User } from '@/types';
 
 interface MeetingsListProps {
   token: string;
@@ -24,10 +24,12 @@ export default function MeetingsList({
 }: MeetingsListProps) {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
   const [editingMeeting, setEditingMeeting] = useState<Meeting | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [editAttendeeSearch, setEditAttendeeSearch] = useState('');
   const [processingMeetingId, setProcessingMeetingId] = useState<string | null>(null);
   const [showRejectModal, setShowRejectModal] = useState<Meeting | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
@@ -78,9 +80,24 @@ export default function MeetingsList({
     }
   }, [token]);
 
+  const fetchUsers = useCallback(async () => {
+    try {
+      const res = await fetch('/api/users', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success) {
+        setUsers(data.data);
+      }
+    } catch (err) {
+      console.error('Error fetching users:', err);
+    }
+  }, [token]);
+
   useEffect(() => {
     fetchDepartments();
-  }, [fetchDepartments]);
+    fetchUsers();
+  }, [fetchDepartments, fetchUsers]);
 
   useEffect(() => {
     fetchMeetings();
@@ -297,8 +314,57 @@ export default function MeetingsList({
   };
 
   const handleEdit = (meeting: Meeting) => {
-    setEditingMeeting(meeting);
+    setEditingMeeting({
+      ...meeting,
+      allMembers: meeting.allMembers !== false,
+      attendeeIds: meeting.attendeeIds || [],
+    });
+    setEditAttendeeSearch('');
     setShowEditModal(true);
+  };
+
+  // Get department members for the editing meeting
+  const editDepartmentMembers = useMemo(() => {
+    if (!editingMeeting?.departmentId) return [];
+    const dept = departments.find(d => d.id === editingMeeting.departmentId);
+    if (!dept) return [];
+    const memberIds = [...(dept.adminIds || []), ...(dept.memberIds || [])];
+    return users.filter(u => memberIds.includes(u.id));
+  }, [editingMeeting?.departmentId, departments, users]);
+
+  // Filter members by search for edit modal
+  const filteredEditMembers = useMemo(() => {
+    if (!editAttendeeSearch) return editDepartmentMembers;
+    const query = editAttendeeSearch.toLowerCase();
+    return editDepartmentMembers.filter(u =>
+      u.name?.toLowerCase().includes(query) ||
+      u.email?.toLowerCase().includes(query)
+    );
+  }, [editDepartmentMembers, editAttendeeSearch]);
+
+  // Get selected attendees for edit modal
+  const selectedEditAttendees = useMemo(() => {
+    if (!editingMeeting) return [];
+    return users.filter(u => editingMeeting.attendeeIds?.includes(u.id));
+  }, [users, editingMeeting]);
+
+  const toggleEditAttendee = (attendeeId: string) => {
+    if (!editingMeeting) return;
+    const currentIds = editingMeeting.attendeeIds || [];
+    setEditingMeeting({
+      ...editingMeeting,
+      attendeeIds: currentIds.includes(attendeeId)
+        ? currentIds.filter(id => id !== attendeeId)
+        : [...currentIds, attendeeId],
+    });
+  };
+
+  const selectAllEditMembers = () => {
+    if (!editingMeeting) return;
+    setEditingMeeting({
+      ...editingMeeting,
+      attendeeIds: editDepartmentMembers.map(u => u.id),
+    });
   };
 
   const handleSaveEdit = async (e: React.FormEvent) => {
@@ -559,8 +625,8 @@ export default function MeetingsList({
       {/* Edit Modal */}
       {showEditModal && editingMeeting && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
-            <div className="p-6">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="p-4 sm:p-6">
               <h3 className="text-lg font-semibold text-gray-800 mb-4">Edit Meeting</h3>
               <form onSubmit={handleSaveEdit} className="space-y-4">
                 <div>
@@ -651,6 +717,126 @@ export default function MeetingsList({
                     placeholder="e.g., Conference Room A"
                   />
                 </div>
+
+                {/* Attendees Section */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Attendees
+                  </label>
+
+                  {/* All Members Toggle */}
+                  <div className="flex items-center gap-2 mb-3">
+                    <button
+                      type="button"
+                      onClick={() => setEditingMeeting({ ...editingMeeting, allMembers: true, attendeeIds: [] })}
+                      className={`flex-1 py-2 px-3 rounded-lg border text-sm font-medium transition-colors ${
+                        editingMeeting.allMembers
+                          ? 'bg-blue-600 text-white border-blue-600'
+                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      <span className="flex items-center justify-center gap-1">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                        All Members
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditingMeeting({ ...editingMeeting, allMembers: false })}
+                      className={`flex-1 py-2 px-3 rounded-lg border text-sm font-medium transition-colors ${
+                        !editingMeeting.allMembers
+                          ? 'bg-blue-600 text-white border-blue-600'
+                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      <span className="flex items-center justify-center gap-1">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                        Select
+                      </span>
+                    </button>
+                  </div>
+
+                  {/* Member Selection (when not all members) */}
+                  {!editingMeeting.allMembers && (
+                    <div className="border rounded-lg p-3 bg-gray-50">
+                      {editDepartmentMembers.length === 0 ? (
+                        <p className="text-sm text-gray-500 text-center py-2">
+                          No members in this department
+                        </p>
+                      ) : (
+                        <>
+                          {/* Search and Select All */}
+                          <div className="flex gap-2 mb-2">
+                            <input
+                              type="text"
+                              value={editAttendeeSearch}
+                              onChange={(e) => setEditAttendeeSearch(e.target.value)}
+                              placeholder="Search..."
+                              className="flex-1 px-2 py-1 border rounded text-sm bg-white text-gray-900"
+                            />
+                            <button
+                              type="button"
+                              onClick={selectAllEditMembers}
+                              className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                            >
+                              All
+                            </button>
+                          </div>
+
+                          {/* Selected Attendees */}
+                          {selectedEditAttendees.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mb-2">
+                              {selectedEditAttendees.map(user => (
+                                <span
+                                  key={user.id}
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs"
+                                >
+                                  {user.name}
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleEditAttendee(user.id)}
+                                    className="hover:text-blue-900"
+                                  >
+                                    &times;
+                                  </button>
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Member List */}
+                          <div className="max-h-28 overflow-y-auto space-y-1">
+                            {filteredEditMembers.map(user => (
+                              <label
+                                key={user.id}
+                                className="flex items-center gap-2 p-1.5 rounded hover:bg-white cursor-pointer"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={editingMeeting.attendeeIds?.includes(user.id) || false}
+                                  onChange={() => toggleEditAttendee(user.id)}
+                                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                />
+                                <span className="text-sm text-gray-700 truncate">{user.name}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {editingMeeting.allMembers && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      All {editDepartmentMembers.length} members will be notified
+                    </p>
+                  )}
+                </div>
+
                 <div className="flex justify-end gap-3 pt-4">
                   <button
                     type="button"
