@@ -1,10 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { CustomColumn } from '@/types';
+import { CustomColumn, Project } from '@/types';
 
 interface ColumnManagerProps {
   columns: CustomColumn[];
+  projects: Project[];
   token: string;
   departmentId: string;
   onClose: () => void;
@@ -24,6 +25,7 @@ const colorOptions = [
 
 export default function ColumnManager({
   columns: initialColumns,
+  projects,
   token,
   departmentId,
   onClose,
@@ -35,6 +37,13 @@ export default function ColumnManager({
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [newColumnName, setNewColumnName] = useState('');
+  const [migrateModal, setMigrateModal] = useState<{ columnId: string; columnName: string; taskCount: number } | null>(null);
+  const [migrateToColumn, setMigrateToColumn] = useState<string>('');
+
+  // Count tasks in each column
+  const getTaskCountForColumn = (columnId: string) => {
+    return projects.filter(p => p.status === columnId).length;
+  };
 
   const handleAddColumn = () => {
     if (!newColumnName.trim()) return;
@@ -55,7 +64,54 @@ export default function ColumnManager({
       alert('You must have at least 2 columns');
       return;
     }
-    setColumns(columns.filter(c => c.id !== id).map((c, i) => ({ ...c, order: i })));
+
+    const taskCount = getTaskCountForColumn(id);
+    const column = columns.find(c => c.id === id);
+
+    if (taskCount > 0) {
+      // Show migration modal
+      setMigrateModal({ columnId: id, columnName: column?.name || id, taskCount });
+      // Set default migration target to the first available column
+      const otherColumns = columns.filter(c => c.id !== id);
+      setMigrateToColumn(otherColumns[0]?.id || '');
+    } else {
+      // No tasks, just remove the column
+      setColumns(columns.filter(c => c.id !== id).map((c, i) => ({ ...c, order: i })));
+    }
+  };
+
+  const handleConfirmMigration = async () => {
+    if (!migrateModal || !migrateToColumn) return;
+
+    setSaving(true);
+    try {
+      // Migrate tasks to the new column
+      const res = await fetch('/api/projects/migrate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          departmentId,
+          fromStatus: migrateModal.columnId,
+          toStatus: migrateToColumn,
+        }),
+      });
+
+      if (res.ok) {
+        // Remove the column
+        setColumns(columns.filter(c => c.id !== migrateModal.columnId).map((c, i) => ({ ...c, order: i })));
+        setMigrateModal(null);
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to migrate tasks');
+      }
+    } catch {
+      alert('Failed to migrate tasks');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleMoveUp = (index: number) => {
@@ -177,7 +233,7 @@ export default function ColumnManager({
                   style={{ backgroundColor: column.color || '#6b7280' }}
                 />
 
-                {/* Name */}
+                {/* Name and task count */}
                 {editingId === column.id ? (
                   <input
                     type="text"
@@ -189,12 +245,19 @@ export default function ColumnManager({
                     autoFocus
                   />
                 ) : (
-                  <span
-                    className="flex-1 text-sm font-medium text-gray-700 cursor-pointer"
+                  <div
+                    className="flex-1 cursor-pointer"
                     onClick={() => setEditingId(column.id)}
                   >
-                    {column.name}
-                  </span>
+                    <span className="text-sm font-medium text-gray-700">
+                      {column.name}
+                    </span>
+                    {getTaskCountForColumn(column.id) > 0 && (
+                      <span className="ml-2 text-xs text-gray-500 bg-gray-200 px-1.5 py-0.5 rounded">
+                        {getTaskCountForColumn(column.id)} task{getTaskCountForColumn(column.id) !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </div>
                 )}
 
                 {/* Color selector */}
@@ -274,6 +337,63 @@ export default function ColumnManager({
             </button>
           </div>
         </div>
+
+        {/* Migration Modal */}
+        {migrateModal && (
+          <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+              <div className="flex items-start gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                  <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Column Has Tasks</h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    The column &quot;{migrateModal.columnName}&quot; contains {migrateModal.taskCount} task{migrateModal.taskCount !== 1 ? 's' : ''}.
+                    Where would you like to move them?
+                  </p>
+                </div>
+              </div>
+
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Move tasks to:
+                </label>
+                <select
+                  value={migrateToColumn}
+                  onChange={(e) => setMigrateToColumn(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white text-gray-900"
+                >
+                  {columns
+                    .filter(c => c.id !== migrateModal.columnId)
+                    .map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} ({getTaskCountForColumn(c.id)} tasks)
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setMigrateModal(null)}
+                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md text-sm hover:bg-gray-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmMigration}
+                  disabled={saving || !migrateToColumn}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {saving ? 'Moving...' : `Move ${migrateModal.taskCount} Task${migrateModal.taskCount !== 1 ? 's' : ''}`}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
