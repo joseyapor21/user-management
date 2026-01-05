@@ -578,9 +578,19 @@ export default function TaskModal({
         {/* Header */}
         <div className="sticky top-0 bg-white z-10">
           <div className="p-4 border-b flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-800">
-              {isEditing ? 'Edit Task' : 'Task Details'}
-            </h2>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-800">
+                {isEditing ? 'Edit Task' : 'Task Details'}
+              </h2>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                  </svg>
+                  {project.departmentName}
+                </span>
+              </div>
+            </div>
             <button onClick={onClose} className="text-gray-500 hover:text-gray-700 text-2xl p-1 touch-manipulation">
               &times;
             </button>
@@ -893,9 +903,6 @@ export default function TaskModal({
               {/* View Mode */}
               <div>
                 <h3 className="text-xl font-semibold text-gray-800">{project.title}</h3>
-                <p className="text-sm text-gray-500 mt-1">
-                  Department: {project.departmentName}
-                </p>
                 {/* Labels Display */}
                 {project.labels && project.labels.length > 0 && (
                   <div className="flex flex-wrap gap-1 mt-2">
