@@ -869,32 +869,27 @@ function MeetingItemCard({
   return (
     <div
       onClick={handleCardClick}
-      className={`p-3 rounded-lg cursor-pointer transition-all duration-200 ${
+      className={`p-3 rounded-lg cursor-pointer transition-all duration-200 overflow-hidden ${
         isMyDepartment
           ? 'bg-purple-50 border-l-4 border-purple-500'
           : 'bg-gray-50 hover:bg-gray-100'
       } ${isExpanded ? 'ring-2 ring-blue-300' : ''}`}
     >
       {/* Collapsed View */}
-      <div className="flex items-start gap-3">
-        {/* Time column */}
-        <div className="flex flex-col items-end w-16 flex-shrink-0">
-          <span className="text-sm font-medium text-gray-700">{formatTime(meeting.startTime)}</span>
-          <span className="text-xs text-gray-400">{formatTime(meeting.endTime)}</span>
+      <div className="flex items-start gap-2 sm:gap-3">
+        {/* Time column - smaller on mobile */}
+        <div className="flex flex-col items-end w-14 sm:w-16 flex-shrink-0">
+          <span className="text-xs sm:text-sm font-medium text-gray-700">{formatTime(meeting.startTime)}</span>
+          <span className="text-[10px] sm:text-xs text-gray-400">{formatTime(meeting.endTime)}</span>
         </div>
 
         {/* Meeting details */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h4 className="font-semibold text-gray-800">{meeting.title}</h4>
-            {isMyDepartment && (
-              <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs font-medium">
-                My Dept
-              </span>
-            )}
+        <div className="flex-1 min-w-0 overflow-hidden">
+          <div className="flex items-start gap-1 sm:gap-2">
+            <h4 className="font-semibold text-gray-800 text-sm sm:text-base truncate flex-1">{meeting.title}</h4>
             {/* Expand indicator */}
             <svg
-              className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+              className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`}
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -902,49 +897,56 @@ function MeetingItemCard({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
           </div>
-          <div className="flex flex-wrap items-center gap-2 mt-1">
+          <div className="flex flex-wrap items-center gap-1 sm:gap-2 mt-1">
+            {isMyDepartment && (
+              <span className="px-1.5 sm:px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-[10px] sm:text-xs font-medium">
+                My Dept
+              </span>
+            )}
             {meeting.departmentName && (
-              <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">
+              <span className="px-1.5 sm:px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] sm:text-xs truncate max-w-[100px] sm:max-w-none">
                 {meeting.departmentName}
               </span>
             )}
             {/* Attendee indicator */}
             {meeting.allMembers ? (
-              <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs flex items-center gap-1">
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <span className="px-1.5 sm:px-2 py-0.5 bg-green-100 text-green-700 rounded text-[10px] sm:text-xs flex items-center gap-0.5 sm:gap-1">
+                <svg className="w-2.5 sm:w-3 h-2.5 sm:h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                 </svg>
-                All Members
+                <span className="hidden sm:inline">All Members</span>
+                <span className="sm:hidden">All</span>
               </span>
             ) : meeting.attendeeNames && meeting.attendeeNames.length > 0 ? (
-              <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs flex items-center gap-1">
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <span className="px-1.5 sm:px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-[10px] sm:text-xs flex items-center gap-0.5 sm:gap-1">
+                <svg className="w-2.5 sm:w-3 h-2.5 sm:h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
-                {meeting.attendeeNames.length} attendee{meeting.attendeeNames.length !== 1 ? 's' : ''}
+                {meeting.attendeeNames.length}
               </span>
             ) : null}
-            {meeting.location && (
-              <span className="flex items-center gap-1 text-xs text-gray-500">
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                </svg>
-                <span className="truncate">{meeting.location}</span>
-              </span>
-            )}
           </div>
+          {/* Location - separate row on mobile */}
+          {meeting.location && (
+            <div className="flex items-center gap-1 mt-1 text-[10px] sm:text-xs text-gray-500">
+              <svg className="w-2.5 sm:w-3 h-2.5 sm:h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              </svg>
+              <span className="truncate">{meeting.location}</span>
+            </div>
+          )}
           {/* Description preview (truncated when collapsed) */}
           {meeting.description && !isExpanded && (
-            <p className="text-sm text-gray-600 mt-2 line-clamp-1">{meeting.description}</p>
+            <p className="text-xs sm:text-sm text-gray-600 mt-1.5 sm:mt-2 line-clamp-1">{meeting.description}</p>
           )}
         </div>
 
         {/* Actions */}
         {isSuperUser && (
-          <div className="flex gap-1 flex-shrink-0">
+          <div className="flex gap-0.5 sm:gap-1 flex-shrink-0">
             <button
               onClick={onEdit}
-              className="p-1 text-blue-500 hover:text-blue-700"
+              className="p-1.5 sm:p-1 text-blue-500 hover:text-blue-700 touch-manipulation"
               title="Edit"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -953,7 +955,7 @@ function MeetingItemCard({
             </button>
             <button
               onClick={onDelete}
-              className="p-1 text-red-500 hover:text-red-700"
+              className="p-1.5 sm:p-1 text-red-500 hover:text-red-700 touch-manipulation"
               title="Delete"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -966,22 +968,22 @@ function MeetingItemCard({
 
       {/* Expanded View */}
       {isExpanded && (
-        <div className="mt-4 pt-4 border-t border-gray-200 space-y-3">
+        <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-gray-200 space-y-2.5 sm:space-y-3">
           {/* Full Description */}
           {meeting.description ? (
             <div>
-              <h5 className="text-xs font-medium text-gray-500 uppercase mb-1">Description</h5>
-              <p className="text-sm text-gray-700 whitespace-pre-wrap">{meeting.description}</p>
+              <h5 className="text-[10px] sm:text-xs font-medium text-gray-500 uppercase mb-1">Description</h5>
+              <p className="text-xs sm:text-sm text-gray-700 whitespace-pre-wrap break-words">{meeting.description}</p>
             </div>
           ) : (
-            <p className="text-sm text-gray-400 italic">No description provided</p>
+            <p className="text-xs sm:text-sm text-gray-400 italic">No description provided</p>
           )}
 
           {/* Additional Details */}
-          <div className="grid grid-cols-2 gap-4 text-sm">
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs sm:text-sm">
             <div>
               <span className="text-gray-500">Duration:</span>
-              <span className="ml-2 font-medium text-gray-800">
+              <span className="ml-1 sm:ml-2 font-medium text-gray-800">
                 {(() => {
                   const start = meeting.startTime.split(':').map(Number);
                   const end = meeting.endTime.split(':').map(Number);
@@ -997,20 +999,20 @@ function MeetingItemCard({
               </span>
             </div>
             {meeting.location && (
-              <div>
+              <div className="truncate max-w-full">
                 <span className="text-gray-500">Location:</span>
-                <span className="ml-2 font-medium text-gray-800">{meeting.location}</span>
+                <span className="ml-1 sm:ml-2 font-medium text-gray-800">{meeting.location}</span>
               </div>
             )}
           </div>
 
           {/* Attendees */}
           <div>
-            <h5 className="text-xs font-medium text-gray-500 uppercase mb-2">Attendees</h5>
+            <h5 className="text-[10px] sm:text-xs font-medium text-gray-500 uppercase mb-1.5 sm:mb-2">Attendees</h5>
             {meeting.allMembers ? (
               <div className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-full text-[10px] sm:text-xs font-medium">
+                  <svg className="w-2.5 sm:w-3 h-2.5 sm:h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                   </svg>
                   All Department Members
@@ -1021,23 +1023,23 @@ function MeetingItemCard({
                 {meeting.attendeeNames.map((name, idx) => (
                   <span
                     key={idx}
-                    className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-xs"
+                    className="inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-gray-100 text-gray-700 rounded-full text-[10px] sm:text-xs"
                   >
-                    <span className="w-4 h-4 rounded-full bg-blue-500 text-white flex items-center justify-center text-[10px] font-medium">
+                    <span className="w-3.5 sm:w-4 h-3.5 sm:h-4 rounded-full bg-blue-500 text-white flex items-center justify-center text-[8px] sm:text-[10px] font-medium flex-shrink-0">
                       {name.charAt(0).toUpperCase()}
                     </span>
-                    {name}
+                    <span className="truncate max-w-[80px] sm:max-w-none">{name}</span>
                   </span>
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-gray-400 italic">No attendees specified</p>
+              <p className="text-xs sm:text-sm text-gray-400 italic">No attendees specified</p>
             )}
           </div>
 
           {/* Created info if available */}
           {meeting.requestedByName && (
-            <div className="text-xs text-gray-500">
+            <div className="text-[10px] sm:text-xs text-gray-500">
               Requested by: <span className="font-medium">{meeting.requestedByName}</span>
             </div>
           )}
