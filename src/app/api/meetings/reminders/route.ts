@@ -28,6 +28,26 @@ function formatTime(time: string) {
   return `${hour12}:${minutes} ${ampm}`;
 }
 
+// Get current date/time in New York timezone
+function getNewYorkDateTime() {
+  const now = new Date();
+  // Convert to New York timezone
+  const nyString = now.toLocaleString('en-US', { timeZone: 'America/New_York' });
+  const nyDate = new Date(nyString);
+
+  const year = nyDate.getFullYear();
+  const month = String(nyDate.getMonth() + 1).padStart(2, '0');
+  const day = String(nyDate.getDate()).padStart(2, '0');
+  const hours = nyDate.getHours();
+  const minutes = nyDate.getMinutes();
+
+  return {
+    date: `${year}-${month}-${day}`, // YYYY-MM-DD format
+    hours,
+    minutes,
+  };
+}
+
 // GET - Check for meetings starting soon and send reminders
 // This endpoint should be called by a cron job every minute
 export async function GET(request: NextRequest) {
@@ -43,25 +63,25 @@ export async function GET(request: NextRequest) {
 
   try {
     const db = await getDatabase();
-    const now = new Date();
-    const today = now.toISOString().split('T')[0]; // YYYY-MM-DD format
 
-    // Get current time in HH:MM format
-    const currentHours = now.getHours();
-    const currentMinutes = now.getMinutes();
+    // Use New York timezone for date/time calculations
+    const nyTime = getNewYorkDateTime();
+    const today = nyTime.date;
+    const currentHours = nyTime.hours;
+    const currentMinutes = nyTime.minutes;
 
     // Calculate time 10-15 minutes from now
     const reminderMinutes = currentMinutes + 10;
     const reminderHours = currentHours + Math.floor(reminderMinutes / 60);
     const normalizedMinutes = reminderMinutes % 60;
 
-    const reminderTimeStart = `${String(reminderHours).padStart(2, '0')}:${String(normalizedMinutes).padStart(2, '0')}`;
+    const reminderTimeStart = `${String(reminderHours % 24).padStart(2, '0')}:${String(normalizedMinutes).padStart(2, '0')}`;
 
     // Also check 5 minutes later to account for timing variations
     const endMinutes = currentMinutes + 15;
     const endHours = currentHours + Math.floor(endMinutes / 60);
     const normalizedEndMinutes = endMinutes % 60;
-    const reminderTimeEnd = `${String(endHours).padStart(2, '0')}:${String(normalizedEndMinutes).padStart(2, '0')}`;
+    const reminderTimeEnd = `${String(endHours % 24).padStart(2, '0')}:${String(normalizedEndMinutes).padStart(2, '0')}`;
 
     // Find meetings starting in approximately 10 minutes that haven't had reminders sent
     const meetings = await db.collection(COLLECTION_NAME).find({
