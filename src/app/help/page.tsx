@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 
-type Section = 'getting-started' | 'tasks' | 'comments' | 'notifications' | 'admin' | 'tips';
+type Section = 'getting-started' | 'tasks' | 'meetings' | 'schedule' | 'support' | 'comments' | 'notifications' | 'admin' | 'superuser' | 'tips';
 
 export default function HelpPage() {
   const [activeSection, setActiveSection] = useState<Section>('getting-started');
@@ -11,9 +11,13 @@ export default function HelpPage() {
   const sections = [
     { id: 'getting-started', label: 'Getting Started', icon: '🚀' },
     { id: 'tasks', label: 'Managing Tasks', icon: '📋' },
+    { id: 'meetings', label: 'Meetings', icon: '📅' },
+    { id: 'schedule', label: 'Sunday Schedule', icon: '⛪' },
+    { id: 'support', label: 'Support & Tickets', icon: '🎫' },
     { id: 'comments', label: 'Comments & Chat', icon: '💬' },
     { id: 'notifications', label: 'Notifications', icon: '🔔' },
     { id: 'admin', label: 'Admin Features', icon: '⚙️' },
+    { id: 'superuser', label: 'SuperUser Tools', icon: '👑' },
     { id: 'tips', label: 'Tips & Tricks', icon: '💡' },
   ];
 
@@ -63,9 +67,13 @@ export default function HelpPage() {
             <div className="bg-white rounded-lg shadow-sm p-6">
               {activeSection === 'getting-started' && <GettingStarted />}
               {activeSection === 'tasks' && <ManagingTasks />}
+              {activeSection === 'meetings' && <MeetingsSection />}
+              {activeSection === 'schedule' && <SundayScheduleSection />}
+              {activeSection === 'support' && <SupportSection />}
               {activeSection === 'comments' && <CommentsChat />}
               {activeSection === 'notifications' && <Notifications />}
               {activeSection === 'admin' && <AdminFeatures />}
+              {activeSection === 'superuser' && <SuperUserFeatures />}
               {activeSection === 'tips' && <TipsAndTricks />}
             </div>
           </main>
@@ -247,6 +255,256 @@ function ManagingTasks() {
   );
 }
 
+function MeetingsSection() {
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold text-gray-800 mb-2">Meetings</h2>
+        <p className="text-gray-600">Schedule and manage department meetings with your team.</p>
+      </div>
+
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-gray-800">Viewing Meetings</h3>
+        <p className="text-gray-600">Access your meetings from the dashboard:</p>
+        <ol className="list-decimal list-inside space-y-2 text-gray-600">
+          <li>Click the <strong>&quot;Meetings&quot;</strong> tab in the dashboard</li>
+          <li>View meetings in a weekly calendar format</li>
+          <li>Click on any meeting card to see full details</li>
+          <li>Meetings show title, time, location, and attendee count</li>
+        </ol>
+      </div>
+
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-gray-800">Creating a Meeting (Admin)</h3>
+        <p className="text-gray-600">Department admins can schedule meetings directly:</p>
+        <ol className="list-decimal list-inside space-y-2 text-gray-600">
+          <li>Click <strong>&quot;Schedule Meeting&quot;</strong> or <strong>&quot;+&quot;</strong> button</li>
+          <li>Fill in the meeting details:
+            <ul className="list-disc list-inside ml-6 mt-2">
+              <li>Title (required)</li>
+              <li>Department (required)</li>
+              <li>Date and time (required)</li>
+              <li>Location (optional)</li>
+              <li>Description (optional)</li>
+            </ul>
+          </li>
+          <li>Select attendees (All Members or Specific People)</li>
+          <li>Click <strong>&quot;Create Meeting&quot;</strong></li>
+        </ol>
+      </div>
+
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-gray-800">Requesting a Meeting (Regular User)</h3>
+        <p className="text-gray-600">Non-admin users can request meetings for approval:</p>
+        <ol className="list-decimal list-inside space-y-2 text-gray-600">
+          <li>Click <strong>&quot;Request Meeting&quot;</strong></li>
+          <li>Fill in the meeting details</li>
+          <li>Select attendees</li>
+          <li>Click <strong>&quot;Submit Request&quot;</strong></li>
+          <li>Wait for admin or SuperUser approval</li>
+        </ol>
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <p className="text-blue-800 text-sm">
+            <strong>Note:</strong> You&apos;ll receive a notification when your meeting request is approved or rejected.
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-gray-800">Meeting Attendees</h3>
+        <p className="text-gray-600">Control who is invited to meetings:</p>
+        <div className="grid gap-3">
+          <div className="border rounded-lg p-4">
+            <h4 className="font-medium text-gray-800">All Members</h4>
+            <p className="text-gray-600 text-sm mt-1">All department members are automatically invited and notified.</p>
+          </div>
+          <div className="border rounded-lg p-4">
+            <h4 className="font-medium text-gray-800">Select Specific</h4>
+            <p className="text-gray-600 text-sm mt-1">Choose specific people from the department to invite. Only selected attendees receive notifications.</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-gray-800">Meeting Reminders</h3>
+        <p className="text-gray-600">
+          Push notifications are sent 10 minutes before a meeting starts to all attendees who have enabled notifications.
+        </p>
+      </div>
+
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-gray-800">Approving/Rejecting Meetings (Admin)</h3>
+        <p className="text-gray-600">Admins and SuperUsers can manage meeting requests:</p>
+        <ol className="list-decimal list-inside space-y-2 text-gray-600">
+          <li>Pending requests show a yellow <strong>&quot;Pending&quot;</strong> badge</li>
+          <li>Click on a pending meeting to view details</li>
+          <li>Click <strong>&quot;Approve&quot;</strong> or <strong>&quot;Reject&quot;</strong></li>
+          <li>If rejecting, provide a reason</li>
+        </ol>
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <p className="text-yellow-800 text-sm">
+            <strong>Conflict Detection:</strong> The system will warn you if the meeting time conflicts with another approved meeting in the same department.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SundayScheduleSection() {
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold text-gray-800 mb-2">Sunday Schedule</h2>
+        <p className="text-gray-600">Manage and view the weekly Sunday service schedule.</p>
+      </div>
+
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-gray-800">Viewing the Schedule</h3>
+        <ol className="list-decimal list-inside space-y-2 text-gray-600">
+          <li>Click the <strong>&quot;Schedule&quot;</strong> tab in the dashboard</li>
+          <li>View the schedule for the current or upcoming Sunday</li>
+          <li>Use the navigation arrows to view past or future weeks</li>
+          <li>Each row shows a service phase and assigned departments/people</li>
+        </ol>
+      </div>
+
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-gray-800">Service Phases</h3>
+        <p className="text-gray-600">The schedule is organized by service phases:</p>
+        <ul className="list-disc list-inside space-y-1 text-gray-600 ml-4 text-sm">
+          <li>Before the Service</li>
+          <li>Opening</li>
+          <li>Worship</li>
+          <li>Testimonies</li>
+          <li>Sermon</li>
+          <li>Prayer Line</li>
+          <li>Laying of Hands</li>
+          <li>Mass Prayer</li>
+          <li>Offering</li>
+          <li>Grace</li>
+          <li>After Service</li>
+        </ul>
+      </div>
+
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-gray-800">Editing the Schedule</h3>
+        <p className="text-gray-600">Only designated schedule admins can edit:</p>
+        <ol className="list-decimal list-inside space-y-2 text-gray-600">
+          <li>Click <strong>&quot;Edit Schedule&quot;</strong></li>
+          <li>Click on any cell to edit</li>
+          <li>Enter the department and assignees for each phase</li>
+          <li>Click <strong>&quot;Save&quot;</strong> when done</li>
+        </ol>
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <p className="text-blue-800 text-sm">
+            <strong>Tip:</strong> SuperUsers can assign a schedule admin from the schedule settings.
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-gray-800">Copying Previous Schedules</h3>
+        <p className="text-gray-600">
+          When creating a new week&apos;s schedule, you can copy from a previous week to save time.
+          Just navigate to the desired week and make adjustments as needed.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function SupportSection() {
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold text-gray-800 mb-2">Support & Tickets</h2>
+        <p className="text-gray-600">Report issues, request features, or ask questions through the support system.</p>
+      </div>
+
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-gray-800">Accessing Support</h3>
+        <ol className="list-decimal list-inside space-y-2 text-gray-600">
+          <li>Click the <strong>Support</strong> icon in the header (life ring icon)</li>
+          <li>Or navigate directly to <strong>/support</strong></li>
+        </ol>
+      </div>
+
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-gray-800">Submitting a Ticket</h3>
+        <ol className="list-decimal list-inside space-y-2 text-gray-600">
+          <li>Click <strong>&quot;Report Issue&quot;</strong> or choose a quick action:
+            <ul className="list-disc list-inside ml-6 mt-2">
+              <li><strong>Report Bug</strong> - Something isn&apos;t working correctly</li>
+              <li><strong>Request Feature</strong> - Suggest a new feature or improvement</li>
+              <li><strong>Ask Question</strong> - Get help with using the app</li>
+              <li><strong>Other</strong> - General feedback or comments</li>
+            </ul>
+          </li>
+          <li>Fill in the ticket details:
+            <ul className="list-disc list-inside ml-6 mt-2">
+              <li>Title (required)</li>
+              <li>Description (required) - Be as detailed as possible</li>
+              <li>Screenshots (required) - At least one image to show the issue</li>
+            </ul>
+          </li>
+          <li>Click <strong>&quot;Submit Ticket&quot;</strong></li>
+        </ol>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-red-800 text-sm">
+            <strong>Important:</strong> Screenshots are mandatory. They help administrators understand and resolve your issue faster.
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-gray-800">Adding Screenshots</h3>
+        <ol className="list-decimal list-inside space-y-2 text-gray-600">
+          <li>Click <strong>&quot;Add Screenshots&quot;</strong></li>
+          <li>Select one or more image files</li>
+          <li>Images appear as thumbnails - click X to remove</li>
+          <li>Maximum file size: 5MB per image</li>
+        </ol>
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <p className="text-blue-800 text-sm">
+            <strong>Tip:</strong> On mobile, you can take a screenshot and upload it directly. On iPhone, press Power + Volume Up. On Android, press Power + Volume Down.
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-gray-800">Viewing Your Tickets</h3>
+        <p className="text-gray-600">Track the status of your submitted tickets:</p>
+        <ul className="list-disc list-inside space-y-2 text-gray-600 ml-4">
+          <li><strong>Open</strong> - Ticket submitted, waiting for review</li>
+          <li><strong>In Progress</strong> - Being worked on by an administrator</li>
+          <li><strong>Resolved</strong> - Issue has been fixed or addressed</li>
+          <li><strong>Closed</strong> - Ticket is complete</li>
+        </ul>
+      </div>
+
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-gray-800">Responding to Tickets</h3>
+        <ol className="list-decimal list-inside space-y-2 text-gray-600">
+          <li>Click on a ticket to view details</li>
+          <li>View admin responses (highlighted in blue)</li>
+          <li>Add your own response in the text area</li>
+          <li>Click <strong>&quot;Send Response&quot;</strong></li>
+        </ol>
+      </div>
+
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-gray-800">Ticket Notifications</h3>
+        <p className="text-gray-600">You&apos;ll receive push notifications when:</p>
+        <ul className="list-disc list-inside space-y-2 text-gray-600 ml-4">
+          <li>An administrator responds to your ticket</li>
+          <li>Your ticket status changes (in progress, resolved, closed)</li>
+        </ul>
+      </div>
+    </div>
+  );
+}
+
 function CommentsChat() {
   return (
     <div className="space-y-6">
@@ -312,11 +570,29 @@ function Notifications() {
       <div className="space-y-4">
         <h3 className="text-lg font-semibold text-gray-800">Push Notifications</h3>
         <p className="text-gray-600">The app sends push notifications for:</p>
-        <ul className="list-disc list-inside space-y-2 text-gray-600 ml-4">
+
+        <h4 className="font-medium text-gray-700 mt-3">Task Notifications</h4>
+        <ul className="list-disc list-inside space-y-1 text-gray-600 ml-4">
           <li>When a task is assigned to you</li>
           <li>When someone comments on your task</li>
           <li>When your task&apos;s status changes</li>
           <li>When a task you created gets updated</li>
+        </ul>
+
+        <h4 className="font-medium text-gray-700 mt-3">Meeting Notifications</h4>
+        <ul className="list-disc list-inside space-y-1 text-gray-600 ml-4">
+          <li>When you&apos;re invited to a meeting</li>
+          <li>10 minutes before a meeting starts (reminder)</li>
+          <li>When your meeting request is approved or rejected</li>
+          <li>When a meeting you&apos;re attending is updated</li>
+        </ul>
+
+        <h4 className="font-medium text-gray-700 mt-3">Support Ticket Notifications</h4>
+        <ul className="list-disc list-inside space-y-1 text-gray-600 ml-4">
+          <li>When an admin responds to your ticket</li>
+          <li>When your ticket status changes</li>
+          <li>(SuperUsers) When new tickets are submitted</li>
+          <li>(SuperUsers) When users respond to tickets</li>
         </ul>
       </div>
 
@@ -438,6 +714,123 @@ function AdminFeatures() {
   );
 }
 
+function SuperUserFeatures() {
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold text-gray-800 mb-2">SuperUser Tools</h2>
+        <p className="text-gray-600">Exclusive features available only to SuperUsers.</p>
+      </div>
+
+      <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-4">
+        <p className="text-purple-800 text-sm">
+          <strong>Note:</strong> These features are only visible and accessible to users with SuperUser privileges.
+        </p>
+      </div>
+
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-gray-800">User Activity Dashboard</h3>
+        <p className="text-gray-600">Monitor team workloads and task assignments:</p>
+        <ol className="list-decimal list-inside space-y-2 text-gray-600">
+          <li>Go to <strong>Support</strong> &gt; <strong>User Activity Dashboard</strong></li>
+          <li>Or navigate directly to <strong>/admin/activity</strong></li>
+          <li>View all users with their current status</li>
+        </ol>
+        <div className="grid gap-3 mt-3">
+          <div className="border rounded-lg p-4">
+            <h4 className="font-medium text-gray-800">User Cards</h4>
+            <p className="text-gray-600 text-sm mt-1">Each card shows: name, email, busy status, departments, and task counts.</p>
+          </div>
+          <div className="border rounded-lg p-4">
+            <h4 className="font-medium text-gray-800">Busy/Available Status</h4>
+            <p className="text-gray-600 text-sm mt-1">Users with tasks &quot;In Progress&quot; are marked as Busy. Filter by status to find available team members.</p>
+          </div>
+          <div className="border rounded-lg p-4">
+            <h4 className="font-medium text-gray-800">Detailed View</h4>
+            <p className="text-gray-600 text-sm mt-1">Click a user to see their full task list, department roles (admin/member), and completion stats.</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-gray-800">Ticket Management</h3>
+        <p className="text-gray-600">Manage all support tickets from users:</p>
+        <ol className="list-decimal list-inside space-y-2 text-gray-600">
+          <li>Go to <strong>Support</strong> &gt; <strong>Manage All Tickets</strong></li>
+          <li>Or navigate directly to <strong>/admin/tickets</strong></li>
+        </ol>
+
+        <div className="space-y-3 mt-3">
+          <h4 className="font-medium text-gray-800">Dashboard Overview</h4>
+          <p className="text-gray-600 text-sm">View statistics at a glance:</p>
+          <ul className="list-disc list-inside space-y-1 text-gray-600 ml-4 text-sm">
+            <li>Total tickets</li>
+            <li>Open tickets (waiting for response)</li>
+            <li>In Progress tickets (being worked on)</li>
+            <li>Resolved tickets</li>
+            <li>Urgent priority tickets</li>
+          </ul>
+        </div>
+
+        <div className="space-y-3 mt-3">
+          <h4 className="font-medium text-gray-800">Managing Tickets</h4>
+          <ol className="list-decimal list-inside space-y-2 text-gray-600">
+            <li>Click on a ticket to view full details</li>
+            <li>View screenshots submitted by the user</li>
+            <li>Change ticket status:
+              <ul className="list-disc list-inside ml-6 mt-1">
+                <li><strong>Open</strong> - New/waiting</li>
+                <li><strong>In Progress</strong> - Being worked on</li>
+                <li><strong>Resolved</strong> - Issue fixed</li>
+                <li><strong>Closed</strong> - Complete</li>
+              </ul>
+            </li>
+            <li>Change ticket priority (Low, Medium, High, Urgent)</li>
+            <li>Add a response to communicate with the user</li>
+            <li>Delete tickets if necessary</li>
+          </ol>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-gray-800">Schedule Admin Assignment</h3>
+        <p className="text-gray-600">Designate who can edit the Sunday Schedule:</p>
+        <ol className="list-decimal list-inside space-y-2 text-gray-600">
+          <li>Go to the <strong>Schedule</strong> tab</li>
+          <li>Click the settings/gear icon</li>
+          <li>Select a user to be the Schedule Admin</li>
+          <li>Only the assigned admin (and SuperUsers) can edit the schedule</li>
+        </ol>
+      </div>
+
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-gray-800">Meeting Approvals</h3>
+        <p className="text-gray-600">SuperUsers can approve or reject meeting requests from any department:</p>
+        <ul className="list-disc list-inside space-y-2 text-gray-600 ml-4">
+          <li>View all pending meeting requests across all departments</li>
+          <li>Approve meetings with conflict detection</li>
+          <li>Reject with reason</li>
+          <li>Edit any meeting details</li>
+        </ul>
+      </div>
+
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-gray-800">Global Access</h3>
+        <p className="text-gray-600">As a SuperUser, you have access to:</p>
+        <ul className="list-disc list-inside space-y-2 text-gray-600 ml-4">
+          <li>All departments (view and manage)</li>
+          <li>All users (create, edit, delete)</li>
+          <li>All tasks across all departments</li>
+          <li>All meetings (create, approve, edit)</li>
+          <li>System-wide invite link creation</li>
+          <li>User activity monitoring</li>
+          <li>Support ticket management</li>
+        </ul>
+      </div>
+    </div>
+  );
+}
+
 function TipsAndTricks() {
   return (
     <div className="space-y-6">
@@ -512,9 +905,18 @@ function TipsAndTricks() {
 
       <div className="bg-green-50 border border-green-200 rounded-lg p-4">
         <h4 className="font-medium text-green-800 mb-2">Need More Help?</h4>
-        <p className="text-green-700 text-sm">
-          Contact your administrator if you need assistance with your account or have questions not covered here.
+        <p className="text-green-700 text-sm mb-3">
+          If you have questions not covered here or found a bug, submit a support ticket.
         </p>
+        <Link
+          href="/support"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" />
+          </svg>
+          Go to Support
+        </Link>
       </div>
     </div>
   );
