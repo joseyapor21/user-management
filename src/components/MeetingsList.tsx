@@ -858,65 +858,142 @@ function MeetingItemCard({
   onDelete,
   formatTime,
 }: MeetingItemCardProps) {
-  return (
-    <div className={`flex items-start gap-3 p-3 rounded-lg ${
-      isMyDepartment
-        ? 'bg-purple-50 border-l-4 border-purple-500'
-        : 'bg-gray-50'
-    }`}>
-      {/* Time column */}
-      <div className="flex flex-col items-end w-16 flex-shrink-0">
-        <span className="text-sm font-medium text-gray-700">{formatTime(meeting.startTime)}</span>
-        <span className="text-xs text-gray-400">{formatTime(meeting.endTime)}</span>
-      </div>
+  const [isExpanded, setIsExpanded] = useState(false);
 
-      {/* Meeting details */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <h4 className="font-semibold text-gray-800 truncate">{meeting.title}</h4>
-          {isMyDepartment && (
-            <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs font-medium">
-              My Dept
-            </span>
+  const handleCardClick = (e: React.MouseEvent) => {
+    // Don't toggle if clicking on action buttons
+    if ((e.target as HTMLElement).closest('button')) return;
+    setIsExpanded(!isExpanded);
+  };
+
+  return (
+    <div
+      onClick={handleCardClick}
+      className={`p-3 rounded-lg cursor-pointer transition-all duration-200 ${
+        isMyDepartment
+          ? 'bg-purple-50 border-l-4 border-purple-500'
+          : 'bg-gray-50 hover:bg-gray-100'
+      } ${isExpanded ? 'ring-2 ring-blue-300' : ''}`}
+    >
+      {/* Collapsed View */}
+      <div className="flex items-start gap-3">
+        {/* Time column */}
+        <div className="flex flex-col items-end w-16 flex-shrink-0">
+          <span className="text-sm font-medium text-gray-700">{formatTime(meeting.startTime)}</span>
+          <span className="text-xs text-gray-400">{formatTime(meeting.endTime)}</span>
+        </div>
+
+        {/* Meeting details */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h4 className="font-semibold text-gray-800">{meeting.title}</h4>
+            {isMyDepartment && (
+              <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs font-medium">
+                My Dept
+              </span>
+            )}
+            {/* Expand indicator */}
+            <svg
+              className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 mt-1">
+            {meeting.departmentName && (
+              <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">
+                {meeting.departmentName}
+              </span>
+            )}
+            {meeting.location && (
+              <span className="flex items-center gap-1 text-xs text-gray-500">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                </svg>
+                <span className="truncate">{meeting.location}</span>
+              </span>
+            )}
+          </div>
+          {/* Description preview (truncated when collapsed) */}
+          {meeting.description && !isExpanded && (
+            <p className="text-sm text-gray-600 mt-2 line-clamp-1">{meeting.description}</p>
           )}
         </div>
-        {meeting.departmentName && (
-          <span className="inline-block mt-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">
-            {meeting.departmentName}
-          </span>
-        )}
-        {meeting.location && (
-          <div className="flex items-center gap-1 mt-1 text-xs text-gray-500">
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            <span className="truncate">{meeting.location}</span>
+
+        {/* Actions */}
+        {isSuperUser && (
+          <div className="flex gap-1 flex-shrink-0">
+            <button
+              onClick={onEdit}
+              className="p-1 text-blue-500 hover:text-blue-700"
+              title="Edit"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+            </button>
+            <button
+              onClick={onDelete}
+              className="p-1 text-red-500 hover:text-red-700"
+              title="Delete"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
           </div>
         )}
       </div>
 
-      {/* Actions */}
-      {isSuperUser && (
-        <div className="flex gap-1 flex-shrink-0">
-          <button
-            onClick={onEdit}
-            className="p-1 text-blue-500 hover:text-blue-700"
-            title="Edit"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-            </svg>
-          </button>
-          <button
-            onClick={onDelete}
-            className="p-1 text-red-500 hover:text-red-700"
-            title="Delete"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
-          </button>
+      {/* Expanded View */}
+      {isExpanded && (
+        <div className="mt-4 pt-4 border-t border-gray-200 space-y-3">
+          {/* Full Description */}
+          {meeting.description ? (
+            <div>
+              <h5 className="text-xs font-medium text-gray-500 uppercase mb-1">Description</h5>
+              <p className="text-sm text-gray-700 whitespace-pre-wrap">{meeting.description}</p>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-400 italic">No description provided</p>
+          )}
+
+          {/* Additional Details */}
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <span className="text-gray-500">Duration:</span>
+              <span className="ml-2 font-medium text-gray-800">
+                {(() => {
+                  const start = meeting.startTime.split(':').map(Number);
+                  const end = meeting.endTime.split(':').map(Number);
+                  const startMins = start[0] * 60 + start[1];
+                  const endMins = end[0] * 60 + end[1];
+                  const duration = endMins - startMins;
+                  const hours = Math.floor(duration / 60);
+                  const mins = duration % 60;
+                  if (hours > 0 && mins > 0) return `${hours}h ${mins}m`;
+                  if (hours > 0) return `${hours}h`;
+                  return `${mins}m`;
+                })()}
+              </span>
+            </div>
+            {meeting.location && (
+              <div>
+                <span className="text-gray-500">Location:</span>
+                <span className="ml-2 font-medium text-gray-800">{meeting.location}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Created info if available */}
+          {meeting.requestedByName && (
+            <div className="text-xs text-gray-500">
+              Requested by: <span className="font-medium">{meeting.requestedByName}</span>
+            </div>
+          )}
         </div>
       )}
     </div>
