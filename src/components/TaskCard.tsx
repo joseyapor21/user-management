@@ -35,7 +35,8 @@ const labelColors: Record<LabelColor, string> = {
 
 export default function TaskCard({ project, onClick, onDragStart }: TaskCardProps) {
   const priority = priorityColors[project.priority] || priorityColors.medium;
-  const isOverdue = project.dueDate && new Date(project.dueDate) < new Date();
+  // Don't show overdue for completed tasks
+  const isOverdue = project.dueDate && new Date(project.dueDate) < new Date() && project.status !== 'done';
 
   // Calculate subtask progress
   const subtasks = project.subtasks || [];

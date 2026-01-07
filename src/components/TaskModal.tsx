@@ -1034,12 +1034,12 @@ export default function TaskModal({
                     <div>
                       <span className="text-gray-500">Due Date:</span>
                       <span className={`ml-2 font-medium ${
-                        project.dueDate && new Date(project.dueDate) < new Date()
+                        project.dueDate && new Date(project.dueDate) < new Date() && project.status !== 'done'
                           ? 'text-red-600'
                           : 'text-gray-800'
                       }`}>
                         {project.dueDate ? new Date(project.dueDate).toLocaleString() : 'No due date'}
-                        {project.dueDate && new Date(project.dueDate) < new Date() && ' (Overdue)'}
+                        {project.dueDate && new Date(project.dueDate) < new Date() && project.status !== 'done' && ' (Overdue)'}
                       </span>
                     </div>
                     <div>

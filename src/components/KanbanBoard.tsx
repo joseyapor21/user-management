@@ -413,7 +413,8 @@ export default function KanbanBoard({ token, departments, userId, userName, isSu
         const dueDate = p.dueDate ? new Date(p.dueDate) : null;
         switch (dueDateFilter) {
           case 'overdue':
-            if (!dueDate || dueDate >= today) return false;
+            // Exclude done tasks from overdue filter
+            if (!dueDate || dueDate >= today || p.status === 'done') return false;
             break;
           case 'today':
             if (!dueDate) return false;
@@ -442,7 +443,8 @@ export default function KanbanBoard({ token, departments, userId, userName, isSu
       in_progress: filteredProjects.filter(p => p.status === 'in_progress').length,
       done: filteredProjects.filter(p => p.status === 'done').length,
     };
-    const overdue = filteredProjects.filter(p => p.dueDate && new Date(p.dueDate) < new Date()).length;
+    // Exclude done tasks from overdue count
+    const overdue = filteredProjects.filter(p => p.dueDate && new Date(p.dueDate) < new Date() && p.status !== 'done').length;
     const urgent = filteredProjects.filter(p => p.priority === 'urgent').length;
     const high = filteredProjects.filter(p => p.priority === 'high').length;
     const completionRate = total > 0 ? Math.round((byStatus.done / total) * 100) : 0;
