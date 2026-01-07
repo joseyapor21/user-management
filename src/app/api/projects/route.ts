@@ -350,6 +350,14 @@ export async function PUT(request: NextRequest) {
     if (status !== undefined && status !== existingProject.status) {
       updateData.status = status;
       activityEntries.push({ id: new ObjectId().toString(), userId: userInfo.userId, userName: userInfo.userName, action: 'moved', details: `Moved from ${existingProject.status} to ${status}`, timestamp: now });
+
+      // Track completion time for auto-archive feature
+      if (status === 'done') {
+        updateData.completedAt = now;
+      } else if (existingProject.status === 'done') {
+        // Clear completedAt if moving away from done
+        updateData.completedAt = null;
+      }
     }
 
     // Build the update operation

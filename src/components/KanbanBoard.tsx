@@ -94,6 +94,28 @@ export default function KanbanBoard({ token, departments, userId, userName, isSu
     fetchProjects();
   }, [fetchProjects]);
 
+  // Auto-archive done tasks that are older than 2 days (runs once on mount)
+  useEffect(() => {
+    const autoArchiveOldTasks = async () => {
+      try {
+        const res = await fetch('/api/projects/auto-archive', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        if (data.success && data.archived > 0) {
+          console.log(`Auto-archived ${data.archived} task(s)`);
+          fetchProjects(); // Refresh to reflect changes
+        }
+      } catch (err) {
+        console.error('Auto-archive error:', err);
+      }
+    };
+
+    autoArchiveOldTasks();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
+
   // Real-time updates via Pusher (like Google Docs)
   const { triggerUpdate } = useRealtimeUpdates({
     onProjectUpdate: useCallback(() => {

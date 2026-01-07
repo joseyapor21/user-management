@@ -247,6 +247,8 @@ export interface Project {
   recurrence?: RecurrenceConfig;  // Recurring task configuration
   parentRecurringId?: string;  // Reference to parent recurring task
   order: number;
+  // Completion tracking
+  completedAt?: string;  // When task was moved to done
   // Archive/draft fields
   previousStatus?: string;
   archivedAt?: string;
