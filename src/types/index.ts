@@ -233,6 +233,7 @@ export interface Project {
   assigneeName?: string;
   assigneeIds?: string[];  // Multiple assignees
   assigneeNames?: string[];
+  completedByIds?: string[];  // Track which assignees have marked task as done
   createdBy: string;
   creatorName?: string;
   dueDate: string | null;

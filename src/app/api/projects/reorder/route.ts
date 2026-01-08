@@ -71,19 +71,66 @@ export async function PUT(request: NextRequest) {
 
     // Check permissions: admins can reorder anything, assignees can only move their own tasks
     const canManage = await canManageDepartment(userInfo.userId, userInfo.isSuperUser, project.departmentId);
-    const isAssignee = project.assigneeId === userInfo.userId;
+    const isAssignee = project.assigneeId === userInfo.userId || project.assigneeIds?.includes(userInfo.userId);
 
     if (!canManage && !isAssignee) {
       return NextResponse.json({ error: 'You do not have permission to move this project' }, { status: 403 });
     }
 
+    const now = new Date().toISOString();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updateData: any = {
-      'metadata.updatedAt': new Date().toISOString(),
+      'metadata.updatedAt': now,
     };
 
+    const hasMultipleAssignees = project.assigneeIds && project.assigneeIds.length > 1;
+
+    // Handle individual completion for multi-assignee tasks
     if (newStatus !== undefined) {
-      updateData.status = newStatus;
+      if (hasMultipleAssignees && newStatus === 'done' && isAssignee && !canManage) {
+        // Individual assignee marking as done - add to completedByIds
+        const currentCompletedBy = project.completedByIds || [];
+        if (!currentCompletedBy.includes(userInfo.userId)) {
+          updateData.completedByIds = [...currentCompletedBy, userInfo.userId];
+
+          // Check if ALL assignees have now completed
+          const allAssignees = project.assigneeIds || [];
+          const newCompletedBy = [...currentCompletedBy, userInfo.userId];
+          const allCompleted = allAssignees.every((id: string) => newCompletedBy.includes(id));
+
+          if (allCompleted) {
+            // All assignees done - move task to done
+            updateData.status = 'done';
+            updateData.completedAt = now;
+          }
+          // If not all completed, don't change status - task stays in current column
+        }
+      } else if (hasMultipleAssignees && newStatus !== 'done' && isAssignee && !canManage) {
+        // Individual assignee un-marking as done - remove from completedByIds
+        const currentCompletedBy = project.completedByIds || [];
+        if (currentCompletedBy.includes(userInfo.userId)) {
+          updateData.completedByIds = currentCompletedBy.filter((id: string) => id !== userInfo.userId);
+        }
+        updateData.status = newStatus;
+        if (project.status === 'done') {
+          updateData.completedAt = null;
+        }
+      } else {
+        // Admin changing status OR single assignee task - normal behavior
+        updateData.status = newStatus;
+        if (newStatus === 'done') {
+          updateData.completedAt = now;
+          // For admin moving to done, mark all assignees as completed
+          if (hasMultipleAssignees && canManage) {
+            updateData.completedByIds = project.assigneeIds || [];
+          }
+        } else if (project.status === 'done') {
+          updateData.completedAt = null;
+          if (hasMultipleAssignees) {
+            updateData.completedByIds = [];
+          }
+        }
+      }
     }
 
     if (newOrder !== undefined) {

@@ -1011,18 +1011,54 @@ export default function TaskModal({
                       <span className="text-gray-500">Assignee{project.assigneeIds && project.assigneeIds.length > 1 ? 's' : ''}:</span>
                       {project.assigneeIds && project.assigneeIds.length > 1 ? (
                         <div className="ml-2 mt-1">
-                          <div className="flex flex-wrap gap-2">
-                            {project.assigneeNames?.map((name, idx) => (
-                              <div
-                                key={project.assigneeIds?.[idx] || idx}
-                                className="flex items-center gap-1.5 bg-blue-50 text-blue-700 px-2 py-1 rounded-full text-sm"
-                              >
-                                <div className="w-5 h-5 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-medium">
-                                  {name.charAt(0).toUpperCase()}
-                                </div>
-                                <span className="font-medium">{name}</span>
+                          {/* Progress indicator for multi-assignee tasks */}
+                          {project.completedByIds && project.completedByIds.length > 0 && (
+                            <div className="mb-2">
+                              <div className="flex items-center justify-between text-xs mb-1">
+                                <span className="text-gray-500">Completion Progress</span>
+                                <span className="text-green-600 font-medium">
+                                  {project.completedByIds.length}/{project.assigneeIds.length} done
+                                </span>
                               </div>
-                            ))}
+                              <div className="w-full bg-gray-200 rounded-full h-1.5">
+                                <div
+                                  className="bg-green-500 h-1.5 rounded-full transition-all"
+                                  style={{ width: `${(project.completedByIds.length / project.assigneeIds.length) * 100}%` }}
+                                />
+                              </div>
+                            </div>
+                          )}
+                          <div className="flex flex-wrap gap-2">
+                            {project.assigneeNames?.map((name, idx) => {
+                              const assigneeId = project.assigneeIds?.[idx];
+                              const isCompleted = assigneeId && project.completedByIds?.includes(assigneeId);
+                              return (
+                                <div
+                                  key={assigneeId || idx}
+                                  className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-sm ${
+                                    isCompleted
+                                      ? 'bg-green-50 text-green-700 border border-green-200'
+                                      : 'bg-blue-50 text-blue-700'
+                                  }`}
+                                >
+                                  <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-medium ${
+                                    isCompleted ? 'bg-green-500 text-white' : 'bg-blue-500 text-white'
+                                  }`}>
+                                    {isCompleted ? (
+                                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                      </svg>
+                                    ) : (
+                                      name.charAt(0).toUpperCase()
+                                    )}
+                                  </div>
+                                  <span className="font-medium">{name}</span>
+                                  {isCompleted && (
+                                    <span className="text-xs text-green-600">(Done)</span>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       ) : (

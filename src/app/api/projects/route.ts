@@ -348,15 +348,84 @@ export async function PUT(request: NextRequest) {
 
     // Both admins and assignees can change status
     if (status !== undefined && status !== existingProject.status) {
-      updateData.status = status;
-      activityEntries.push({ id: new ObjectId().toString(), userId: userInfo.userId, userName: userInfo.userName, action: 'moved', details: `Moved from ${existingProject.status} to ${status}`, timestamp: now });
+      const hasMultipleAssignees = existingProject.assigneeIds && existingProject.assigneeIds.length > 1;
 
-      // Track completion time for auto-archive feature
-      if (status === 'done') {
-        updateData.completedAt = now;
-      } else if (existingProject.status === 'done') {
+      // Handle individual completion for multi-assignee tasks
+      if (hasMultipleAssignees && status === 'done' && isAssignee && !canManage) {
+        // Individual assignee marking as done - add to completedByIds
+        const currentCompletedBy = existingProject.completedByIds || [];
+        if (!currentCompletedBy.includes(userInfo.userId)) {
+          updateData.completedByIds = [...currentCompletedBy, userInfo.userId];
+          activityEntries.push({
+            id: new ObjectId().toString(),
+            userId: userInfo.userId,
+            userName: userInfo.userName,
+            action: 'completed',
+            details: `Marked as done by ${userInfo.userName}`,
+            timestamp: now
+          });
+
+          // Check if ALL assignees have now completed
+          const allAssignees = existingProject.assigneeIds || [];
+          const newCompletedBy = [...currentCompletedBy, userInfo.userId];
+          const allCompleted = allAssignees.every((id: string) => newCompletedBy.includes(id));
+
+          if (allCompleted) {
+            // All assignees done - move task to done
+            updateData.status = 'done';
+            updateData.completedAt = now;
+            activityEntries.push({
+              id: new ObjectId().toString(),
+              userId: userInfo.userId,
+              userName: userInfo.userName,
+              action: 'moved',
+              details: `All assignees completed - moved to Done`,
+              timestamp: now
+            });
+          }
+          // If not all completed, don't change status - task stays in current column
+        }
+      } else if (hasMultipleAssignees && status !== 'done' && isAssignee && !canManage) {
+        // Individual assignee un-marking as done - remove from completedByIds
+        const currentCompletedBy = existingProject.completedByIds || [];
+        if (currentCompletedBy.includes(userInfo.userId)) {
+          updateData.completedByIds = currentCompletedBy.filter((id: string) => id !== userInfo.userId);
+          activityEntries.push({
+            id: new ObjectId().toString(),
+            userId: userInfo.userId,
+            userName: userInfo.userName,
+            action: 'uncompleted',
+            details: `Unmarked as done by ${userInfo.userName}`,
+            timestamp: now
+          });
+        }
+        // Also update status if they're moving it
+        updateData.status = status;
+        activityEntries.push({ id: new ObjectId().toString(), userId: userInfo.userId, userName: userInfo.userName, action: 'moved', details: `Moved from ${existingProject.status} to ${status}`, timestamp: now });
+
         // Clear completedAt if moving away from done
-        updateData.completedAt = null;
+        if (existingProject.status === 'done') {
+          updateData.completedAt = null;
+        }
+      } else {
+        // Admin changing status OR single assignee task - normal behavior
+        updateData.status = status;
+        activityEntries.push({ id: new ObjectId().toString(), userId: userInfo.userId, userName: userInfo.userName, action: 'moved', details: `Moved from ${existingProject.status} to ${status}`, timestamp: now });
+
+        // Track completion time for auto-archive feature
+        if (status === 'done') {
+          updateData.completedAt = now;
+          // For admin moving to done, mark all assignees as completed
+          if (hasMultipleAssignees && canManage) {
+            updateData.completedByIds = existingProject.assigneeIds || [];
+          }
+        } else if (existingProject.status === 'done') {
+          // Clear completedAt and completedByIds if moving away from done
+          updateData.completedAt = null;
+          if (hasMultipleAssignees) {
+            updateData.completedByIds = [];
+          }
+        }
       }
     }
 

@@ -258,7 +258,8 @@ export default function KanbanBoard({ token, departments, userId, userName, isSu
     // Check permissions: admins can move any, others can only move their assigned tasks
     const canMove = isSuperUser ||
       departments.some(d => d.id === draggedProject.departmentId && d.adminIds.includes(userId)) ||
-      draggedProject.assigneeId === userId;
+      draggedProject.assigneeId === userId ||
+      draggedProject.assigneeIds?.includes(userId);
 
     if (!canMove) {
       showError('You can only move tasks assigned to you');
@@ -267,11 +268,34 @@ export default function KanbanBoard({ token, departments, userId, userName, isSu
     }
 
     const oldStatus = draggedProject.status;
+    const hasMultipleAssignees = draggedProject.assigneeIds && draggedProject.assigneeIds.length > 1;
+    const isAdmin = isSuperUser || departments.some(d => d.id === draggedProject.departmentId && d.adminIds.includes(userId));
+    const isJustAssignee = !isAdmin && (draggedProject.assigneeId === userId || draggedProject.assigneeIds?.includes(userId));
 
-    // Optimistic update
-    setProjects(prev => prev.map(p =>
-      p.id === draggedProject.id ? { ...p, status: newStatus as ProjectStatus } : p
-    ));
+    // Optimistic update - handle multi-assignee completion
+    if (hasMultipleAssignees && newStatus === 'done' && isJustAssignee) {
+      // Individual assignee marking as done - add to completedByIds
+      const currentCompletedBy = draggedProject.completedByIds || [];
+      if (!currentCompletedBy.includes(userId)) {
+        const newCompletedBy = [...currentCompletedBy, userId];
+        const allCompleted = draggedProject.assigneeIds!.every(id => newCompletedBy.includes(id));
+
+        setProjects(prev => prev.map(p =>
+          p.id === draggedProject.id
+            ? {
+                ...p,
+                completedByIds: newCompletedBy,
+                status: allCompleted ? 'done' as ProjectStatus : p.status // Only move to done if all completed
+              }
+            : p
+        ));
+      }
+    } else {
+      // Normal status update (admin or single assignee)
+      setProjects(prev => prev.map(p =>
+        p.id === draggedProject.id ? { ...p, status: newStatus as ProjectStatus } : p
+      ));
+    }
 
     try {
       const res = await fetch('/api/projects/reorder', {
@@ -288,16 +312,31 @@ export default function KanbanBoard({ token, departments, userId, userName, isSu
 
       if (res.ok) {
         // Show toast notification for task moved
-        showToast({
-          type: 'task_moved',
-          taskTitle: draggedProject.title,
-          taskId: draggedProject.id,
-          byUser: 'You',
-          details: {
-            oldStatus,
-            newStatus,
-          },
-        });
+        if (hasMultipleAssignees && newStatus === 'done' && isJustAssignee) {
+          // Individual completion message
+          const newCompletedBy = [...(draggedProject.completedByIds || []), userId];
+          const allCompleted = draggedProject.assigneeIds!.every(id => newCompletedBy.includes(id));
+          showToast({
+            type: allCompleted ? 'task_moved' : 'task_edited',
+            taskTitle: draggedProject.title,
+            taskId: draggedProject.id,
+            byUser: 'You',
+            details: allCompleted
+              ? { oldStatus, newStatus }
+              : { changedFields: ['marked as completed'] },
+          });
+        } else {
+          showToast({
+            type: 'task_moved',
+            taskTitle: draggedProject.title,
+            taskId: draggedProject.id,
+            byUser: 'You',
+            details: {
+              oldStatus,
+              newStatus,
+            },
+          });
+        }
 
         // Send push notification to assignee if different from current user
         if (draggedProject.assigneeId && draggedProject.assigneeId !== userId) {
