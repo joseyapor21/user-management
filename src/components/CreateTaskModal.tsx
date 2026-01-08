@@ -50,7 +50,7 @@ export default function CreateTaskModal({
   const [saving, setSaving] = useState(false);
   const [members, setMembers] = useState<User[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
-  const { showToast, showError } = useNotifications();
+  const { showError } = useNotifications();
 
   const [form, setForm] = useState({
     departmentId: initialDepartmentId,
@@ -156,13 +156,6 @@ export default function CreateTaskModal({
 
       if (res.ok) {
         const data = await res.json();
-
-        showToast({
-          type: 'task_created',
-          taskTitle: form.title,
-          taskId: data.data?.id || '',
-          byUser: 'You',
-        });
 
         // Send push notification to all assignees
         const assigneesToNotify = allAssignees.filter(id => id !== userId);

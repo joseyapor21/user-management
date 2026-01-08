@@ -32,7 +32,7 @@ export default function DraftsModal({
   const [loading, setLoading] = useState(true);
   const [restoring, setRestoring] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
-  const { showToast, showError } = useNotifications();
+  const { showError } = useNotifications();
 
   // Check if user can manage a department
   const canManageDepartment = useCallback((deptId: string): boolean => {
@@ -88,12 +88,6 @@ export default function DraftsModal({
 
       const data = await res.json();
       if (data.success) {
-        showToast({
-          type: 'task_created',
-          taskTitle: 'Task',
-          taskId: taskId,
-          byUser: 'You',
-        });
         // Remove from local list
         setArchivedTasks(prev => prev.filter(t => t.id !== taskId));
         onRestore();
@@ -122,12 +116,6 @@ export default function DraftsModal({
 
       const data = await res.json();
       if (data.success) {
-        showToast({
-          type: 'task_deleted',
-          taskTitle: 'Task',
-          taskId: taskId,
-          byUser: 'You',
-        });
         // Remove from local list
         setArchivedTasks(prev => prev.filter(t => t.id !== taskId));
       } else {

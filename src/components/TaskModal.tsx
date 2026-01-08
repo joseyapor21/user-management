@@ -77,7 +77,7 @@ export default function TaskModal({
   const [uploadingFile, setUploadingFile] = useState(false);
   const [attachmentUrl, setAttachmentUrl] = useState('');
   const [attachmentName, setAttachmentName] = useState('');
-  const { showToast, showError } = useNotifications();
+  const { showError } = useNotifications();
 
   const [form, setForm] = useState({
     title: project.title,
@@ -212,26 +212,8 @@ export default function TaskModal({
           changedFields.push('assignee');
         }
 
-        // Show toast for edited task
-        if (changedFields.length > 0) {
-          showToast({
-            type: 'task_edited',
-            taskTitle: form.title,
-            taskId: project.id,
-            byUser: 'You',
-            details: { changedFields },
-          });
-        }
-
         // Send push notification if assignee changed
         if (assigneeChanged && newAssigneeId && newAssigneeId !== userId) {
-          showToast({
-            type: 'task_assigned',
-            taskTitle: form.title,
-            taskId: project.id,
-            byUser: 'You',
-          });
-
           fetch('/api/push/send', {
             method: 'POST',
             headers: {
@@ -301,12 +283,6 @@ export default function TaskModal({
       });
 
       if (res.ok) {
-        showToast({
-          type: 'task_deleted',
-          taskTitle: project.title,
-          taskId: project.id,
-          byUser: 'You',
-        });
         onDelete();
       } else {
         const data = await res.json();
@@ -334,13 +310,6 @@ export default function TaskModal({
       });
 
       if (res.ok) {
-        showToast({
-          type: 'comment_added',
-          taskTitle: project.title,
-          taskId: project.id,
-          byUser: 'You',
-        });
-
         // Notify assignee and creator about new comment (if different from current user)
         const usersToNotify: string[] = [];
         if (project.assigneeId && project.assigneeId !== userId && !usersToNotify.includes(project.assigneeId)) {
@@ -474,13 +443,6 @@ export default function TaskModal({
       });
 
       if (res.ok) {
-        showToast({
-          type: 'task_edited',
-          taskTitle: project.title,
-          taskId: project.id,
-          byUser: 'You',
-          details: { changedFields: ['attachment added'] },
-        });
         setAttachmentUrl('');
         setAttachmentName('');
         onUpdate();
@@ -532,13 +494,6 @@ export default function TaskModal({
       });
 
       if (res.ok) {
-        showToast({
-          type: 'task_edited',
-          taskTitle: project.title,
-          taskId: project.id,
-          byUser: 'You',
-          details: { changedFields: ['logged hours'] },
-        });
         setShowLogTime(false);
         onUpdate();
       } else {
@@ -616,16 +571,6 @@ export default function TaskModal({
                           body: JSON.stringify({ id: project.id, status: opt.value }),
                         });
                         if (res.ok) {
-                          showToast({
-                            type: 'task_moved',
-                            taskTitle: project.title,
-                            taskId: project.id,
-                            byUser: 'You',
-                            details: {
-                              oldStatus: project.status,
-                              newStatus: opt.value,
-                            },
-                          });
                           onUpdate();
                         }
                       } catch {

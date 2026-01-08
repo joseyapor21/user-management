@@ -54,7 +54,7 @@ export default function KanbanBoard({ token, departments, userId, userName, isSu
   const [showDraftsModal, setShowDraftsModal] = useState(false);
   const [pendingTaskId, setPendingTaskId] = useState<string | null>(null);
   const [initialModalTab, setInitialModalTab] = useState<string | null>(null);
-  const { showToast, showError } = useNotifications();
+  const { showError } = useNotifications();
 
   // Check if user can manage tasks (is admin of any department or superuser)
   const canManageTasks = isSuperUser || isAdmin || departments.some(d => d.adminIds.includes(userId));
@@ -311,33 +311,6 @@ export default function KanbanBoard({ token, departments, userId, userName, isSu
       });
 
       if (res.ok) {
-        // Show toast notification for task moved
-        if (hasMultipleAssignees && newStatus === 'done' && isJustAssignee) {
-          // Individual completion message
-          const newCompletedBy = [...(draggedProject.completedByIds || []), userId];
-          const allCompleted = draggedProject.assigneeIds!.every(id => newCompletedBy.includes(id));
-          showToast({
-            type: allCompleted ? 'task_moved' : 'task_edited',
-            taskTitle: draggedProject.title,
-            taskId: draggedProject.id,
-            byUser: 'You',
-            details: allCompleted
-              ? { oldStatus, newStatus }
-              : { changedFields: ['marked as completed'] },
-          });
-        } else {
-          showToast({
-            type: 'task_moved',
-            taskTitle: draggedProject.title,
-            taskId: draggedProject.id,
-            byUser: 'You',
-            details: {
-              oldStatus,
-              newStatus,
-            },
-          });
-        }
-
         // Send push notification to assignee if different from current user
         if (draggedProject.assigneeId && draggedProject.assigneeId !== userId) {
           const statusLabels: Record<string, string> = {
