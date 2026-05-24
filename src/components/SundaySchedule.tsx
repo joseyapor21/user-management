@@ -101,7 +101,10 @@ export default function SundaySchedule({ token, isSuperUser, departments, curren
   const getMyPosts = useCallback(() => {
     if (!schedule?.slots || !currentUserName) return [];
     const filtered = schedule.slots.filter(slot =>
-      slot.assignees && slot.assignees.toLowerCase().includes(currentUserName.toLowerCase())
+      slot.assignees &&
+      slot.assignees.toLowerCase().includes(currentUserName.toLowerCase()) &&
+      config.departments.includes(slot.department) &&
+      config.phases.includes(slot.phase)
     );
     // Sort by phase order (as defined in config.phases)
     return filtered.sort((a, b) => {
@@ -220,7 +223,7 @@ export default function SundaySchedule({ token, isSuperUser, departments, curren
   }, [fetchConfig]);
 
   // Save schedule configuration
-  const saveConfig = async (newConfig: Partial<ScheduleConfig>) => {
+  const saveConfig = async (newConfig: Record<string, unknown>) => {
     try {
       await fetch('/api/schedules/config', {
         method: 'PUT',
@@ -254,10 +257,31 @@ export default function SundaySchedule({ token, isSuperUser, departments, curren
   // Rename department or phase
   const renameItem = async (type: 'departments' | 'phases', index: number) => {
     if (!editingItemValue.trim()) return;
+    const oldName = config[type][index];
+    const newName = editingItemValue.trim();
+    if (oldName === newName) {
+      setEditingItemIndex(null);
+      setEditingItemValue('');
+      return;
+    }
     const newList = [...config[type]];
-    newList[index] = editingItemValue.trim();
+    newList[index] = newName;
     setConfig({ ...config, [type]: newList });
-    await saveConfig({ [type]: newList });
+    const renameKey = type === 'departments' ? 'renamedDepartment' : 'renamedPhase';
+    await saveConfig({ [type]: newList, [renameKey]: { oldName, newName } });
+    // Update local schedule slots to reflect the rename
+    if (schedule) {
+      const updatedSlots = schedule.slots.map(slot => {
+        if (type === 'departments' && slot.department === oldName) {
+          return { ...slot, department: newName };
+        }
+        if (type === 'phases' && slot.phase === oldName) {
+          return { ...slot, phase: newName };
+        }
+        return slot;
+      });
+      setSchedule({ ...schedule, slots: updatedSlots });
+    }
     setEditingItemIndex(null);
     setEditingItemValue('');
   };

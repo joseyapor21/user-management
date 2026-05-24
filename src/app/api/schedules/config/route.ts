@@ -87,9 +87,10 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { departments, phases } = body;
+    const { departments, phases, renamedDepartment, renamedPhase } = body;
 
     const now = new Date().toISOString();
+    const SCHEDULES_COLLECTION = 'v5schedules';
 
     // Update departments if provided
     if (departments !== undefined) {
@@ -105,6 +106,16 @@ export async function PUT(request: NextRequest) {
         },
         { upsert: true }
       );
+
+      // If a department was renamed, update all schedule slots
+      if (renamedDepartment) {
+        const { oldName, newName } = renamedDepartment;
+        await db.collection(SCHEDULES_COLLECTION).updateMany(
+          { 'slots.department': oldName },
+          { $set: { 'slots.$[elem].department': newName } },
+          { arrayFilters: [{ 'elem.department': oldName }] }
+        );
+      }
     }
 
     // Update phases if provided
@@ -121,6 +132,16 @@ export async function PUT(request: NextRequest) {
         },
         { upsert: true }
       );
+
+      // If a phase was renamed, update all schedule slots
+      if (renamedPhase) {
+        const { oldName, newName } = renamedPhase;
+        await db.collection(SCHEDULES_COLLECTION).updateMany(
+          { 'slots.phase': oldName },
+          { $set: { 'slots.$[elem].phase': newName } },
+          { arrayFilters: [{ 'elem.phase': oldName }] }
+        );
+      }
     }
 
     return NextResponse.json({
