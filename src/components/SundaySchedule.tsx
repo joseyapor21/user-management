@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import toast from 'react-hot-toast';
 import { ScheduleSlot, SERVICE_PHASES, SCHEDULE_DEPARTMENTS, User, Department } from '@/types';
 import { useRealtimeUpdates } from '@/hooks/useRealtimeUpdates';
 
@@ -75,9 +76,9 @@ export default function SundaySchedule({ token, isSuperUser, departments, curren
   const [selectedAdminId, setSelectedAdminId] = useState<string>('');
   const [savingAdmin, setSavingAdmin] = useState(false);
 
-  // Cell editing with user selector
-  const [showUserDropdown, setShowUserDropdown] = useState(false);
+  // Cell editing with type-to-search user picker
   const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [highlightIndex, setHighlightIndex] = useState(0);
 
   // Schedule configuration (custom departments and phases)
   const [config, setConfig] = useState<ScheduleConfig>({
@@ -87,6 +88,7 @@ export default function SundaySchedule({ token, isSuperUser, departments, curren
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [editingConfig, setEditingConfig] = useState<'departments' | 'phases' | null>(null);
   const [newItemName, setNewItemName] = useState('');
+  const [deptSearch, setDeptSearch] = useState('');
   const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
   const [editingItemValue, setEditingItemValue] = useState('');
 
@@ -96,6 +98,69 @@ export default function SundaySchedule({ token, isSuperUser, departments, curren
     const slot = schedule.slots.find(s => s.phase === phase && s.department === dept);
     return slot?.assignees || '';
   }, [schedule]);
+
+  // Which known users are named inside a slot's free-form text
+  const matchedUsersInText = useCallback((text: string): string[] => {
+    if (!text) return [];
+    const lower = text.toLowerCase();
+    return users.map(u => u.name).filter(name => name && lower.includes(name.toLowerCase()));
+  }, [users]);
+
+  // ----- Conflict detection -----
+  // A person can't serve in two departments during the same phase (= same time).
+  // Returns conflicts keyed by `${phase}|||${dept}` plus a flat list for the banner.
+  const { cellConflicts, conflictList } = useMemo(() => {
+    const cellMap = new Map<string, { name: string; otherDepts: string[] }[]>();
+    const list: { phase: string; name: string; depts: string[] }[] = [];
+    const slots = schedule?.slots || [];
+    const slotText = (phase: string, dept: string) =>
+      slots.find(s => s.phase === phase && s.department === dept)?.assignees || '';
+
+    for (const phase of config.phases) {
+      const personDepts = new Map<string, string[]>(); // name -> depts in this phase
+      for (const dept of config.departments) {
+        for (const name of matchedUsersInText(slotText(phase, dept))) {
+          const arr = personDepts.get(name) || [];
+          if (!arr.includes(dept)) arr.push(dept);
+          personDepts.set(name, arr);
+        }
+      }
+      for (const [name, depts] of personDepts) {
+        if (depts.length > 1) {
+          list.push({ phase, name, depts });
+          for (const dept of depts) {
+            const key = `${phase}|||${dept}`;
+            const entry = cellMap.get(key) || [];
+            entry.push({ name, otherDepts: depts.filter(d => d !== dept) });
+            cellMap.set(key, entry);
+          }
+        }
+      }
+    }
+    return { cellConflicts: cellMap, conflictList: list };
+  }, [schedule, config.phases, config.departments, matchedUsersInText]);
+
+  const getCellConflicts = useCallback(
+    (phase: string, dept: string) => cellConflicts.get(`${phase}|||${dept}`) || [],
+    [cellConflicts]
+  );
+
+  // Map of department NAME -> set of its member/admin user IDs
+  const deptMemberIds = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    departments.forEach(d => {
+      map.set(d.name, new Set<string>([...(d.memberIds || []), ...(d.adminIds || [])]));
+    });
+    return map;
+  }, [departments]);
+
+  // Users that belong to a given schedule column (by department name).
+  // Falls back to all users if the column doesn't match a real department.
+  const usersForDept = useCallback((deptName: string): UserOption[] => {
+    const ids = deptMemberIds.get(deptName);
+    if (!ids || ids.size === 0) return users;
+    return users.filter(u => ids.has(u.id));
+  }, [deptMemberIds, users]);
 
   // Get all cells where the current user appears (sorted by phase order)
   const getMyPosts = useCallback(() => {
@@ -162,38 +227,26 @@ export default function SundaySchedule({ token, isSuperUser, departments, curren
   // Fetch department members for user selection
   const fetchUsers = useCallback(async () => {
     try {
-      // Get all unique member IDs from all departments
-      const allMemberIds = new Set<string>();
-      departments.forEach(dept => {
-        dept.memberIds?.forEach(id => allMemberIds.add(id));
-        dept.adminIds?.forEach(id => allMemberIds.add(id));
-      });
-
-      if (allMemberIds.size === 0) {
-        setUsers([]);
-        return;
-      }
-
-      // Fetch user details for each member
+      // Load all users once (independent of the departments prop, so it isn't
+      // empty while departments are still loading). Per-department filtering is
+      // done in usersForDept().
       const res = await fetch('/api/users', {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
       if (data.success) {
-        // Filter to only include department members
-        const departmentMembers = data.data
-          .filter((u: User) => allMemberIds.has(u.id))
-          .map((u: User) => ({
+        setUsers(
+          data.data.map((u: User) => ({
             id: u.id,
             name: u.name || u.email,
             email: u.email,
-          }));
-        setUsers(departmentMembers);
+          }))
+        );
       }
     } catch (error) {
       console.error('Error fetching users:', error);
     }
-  }, [token, departments]);
+  }, [token]);
 
   // Fetch users on mount
   useEffect(() => {
@@ -245,6 +298,14 @@ export default function SundaySchedule({ token, isSuperUser, departments, curren
     setConfig({ ...config, [type]: newList });
     await saveConfig({ [type]: newList });
     setNewItemName('');
+  };
+
+  // Add a real department (by its actual name) as a schedule column
+  const addDepartmentColumn = async (name: string) => {
+    if (config.departments.includes(name)) return;
+    const newList = [...config.departments, name];
+    setConfig({ ...config, departments: newList });
+    await saveConfig({ departments: newList });
   };
 
   // Delete department or phase
@@ -342,32 +403,34 @@ export default function SundaySchedule({ token, isSuperUser, departments, curren
     const currentValue = getSlotValue(phase, dept);
     setCellValue(currentValue);
     setUserSearchQuery('');
-    setShowUserDropdown(false);
+    setHighlightIndex(0);
   };
 
-  // Save cell edit
-  const saveCell = async () => {
+  // Persist a specific cell value to the server (used by manual Save and by
+  // name-add, which saves immediately without closing the editor).
+  const persistCellValue = async (value: string, closeEditor: boolean) => {
     if (!editingCell || !schedule) return;
 
     const { phase, dept } = editingCell;
+    const trimmed = value.trim();
     const newSlots = [...schedule.slots];
 
     // Find existing slot or create new
     const existingIndex = newSlots.findIndex(s => s.phase === phase && s.department === dept);
 
     if (existingIndex >= 0) {
-      if (cellValue.trim()) {
-        newSlots[existingIndex] = { ...newSlots[existingIndex], assignees: cellValue.trim() };
+      if (trimmed) {
+        newSlots[existingIndex] = { ...newSlots[existingIndex], assignees: trimmed };
       } else {
         newSlots.splice(existingIndex, 1);
       }
-    } else if (cellValue.trim()) {
-      newSlots.push({ phase, department: dept, assignees: cellValue.trim() });
+    } else if (trimmed) {
+      newSlots.push({ phase, department: dept, assignees: trimmed });
     }
 
     // Update local state immediately
     setSchedule({ ...schedule, slots: newSlots });
-    setEditingCell(null);
+    if (closeEditor) setEditingCell(null);
 
     // Save to server
     setSaving(true);
@@ -392,12 +455,15 @@ export default function SundaySchedule({ token, isSuperUser, departments, curren
     }
   };
 
+  // Save cell edit (manual Save button / Enter on empty search) and close.
+  const saveCell = () => persistCellValue(cellValue, true);
+
   // Cancel editing
   const cancelEditing = () => {
     setEditingCell(null);
     setCellValue('');
-    setShowUserDropdown(false);
     setUserSearchQuery('');
+    setHighlightIndex(0);
   };
 
   if (loading) {
@@ -469,23 +535,59 @@ export default function SundaySchedule({ token, isSuperUser, departments, curren
               </button>
             </div>
             <div className="p-4 overflow-y-auto max-h-[60vh]">
-              {/* Add new item */}
-              <div className="flex gap-2 mb-4">
-                <input
-                  type="text"
-                  value={newItemName}
-                  onChange={(e) => setNewItemName(e.target.value)}
-                  placeholder={`Add ${editingConfig === 'departments' ? 'department' : 'phase'}...`}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm bg-white text-gray-900"
-                  onKeyDown={(e) => e.key === 'Enter' && addItem(editingConfig)}
-                />
-                <button
-                  onClick={() => addItem(editingConfig)}
-                  className="px-3 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700"
-                >
-                  Add
-                </button>
-              </div>
+              {/* Add area: free-text for phases, search-from-database for departments */}
+              {editingConfig === 'phases' ? (
+                <div className="flex gap-2 mb-4">
+                  <input
+                    type="text"
+                    value={newItemName}
+                    onChange={(e) => setNewItemName(e.target.value)}
+                    placeholder="Add phase..."
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm bg-white text-gray-900"
+                    onKeyDown={(e) => e.key === 'Enter' && addItem('phases')}
+                  />
+                  <button
+                    onClick={() => addItem('phases')}
+                    className="px-3 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700"
+                  >
+                    Add
+                  </button>
+                </div>
+              ) : (
+                <div className="mb-4">
+                  <input
+                    type="text"
+                    value={deptSearch}
+                    onChange={(e) => setDeptSearch(e.target.value)}
+                    placeholder="Search departments..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white text-gray-900"
+                    autoFocus
+                  />
+                  {deptSearch.trim() && (() => {
+                    const matches = departments
+                      .filter(d => !config.departments.includes(d.name) && d.name.toLowerCase().includes(deptSearch.trim().toLowerCase()))
+                      .sort((a, b) => a.name.localeCompare(b.name));
+                    return (
+                      <div className="mt-2 space-y-2 max-h-56 overflow-y-auto">
+                        {matches.length === 0 ? (
+                          <p className="px-1 text-xs text-gray-400">No departments match &quot;{deptSearch}&quot;</p>
+                        ) : (
+                          matches.map(d => (
+                            <button
+                              key={d.id}
+                              onClick={() => addDepartmentColumn(d.name)}
+                              className="w-full flex items-center justify-between gap-2 p-2 bg-gray-50 rounded-md text-sm text-gray-700 hover:bg-blue-50"
+                            >
+                              <span>{d.name}</span>
+                              <span className="text-xs font-medium text-blue-600">+ Add</span>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
 
               {/* List items */}
               <div className="space-y-2">
@@ -640,7 +742,7 @@ export default function SundaySchedule({ token, isSuperUser, departments, curren
 
             <button
               onClick={() => setSelectedDate(getNextSunday(new Date()))}
-              className="px-3 py-2 text-sm bg-gray-100 rounded-md hover:bg-gray-200"
+              className="px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200"
             >
               Today
             </button>
@@ -673,7 +775,7 @@ export default function SundaySchedule({ token, isSuperUser, departments, curren
                     setEditingConfig('phases');
                     setShowConfigModal(true);
                   }}
-                  className="px-3 py-2 text-sm bg-gray-100 rounded-md hover:bg-gray-200 flex items-center gap-1"
+                  className="px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 flex items-center gap-1"
                   title="Edit Phases"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -686,7 +788,7 @@ export default function SundaySchedule({ token, isSuperUser, departments, curren
                     setEditingConfig('departments');
                     setShowConfigModal(true);
                   }}
-                  className="px-3 py-2 text-sm bg-gray-100 rounded-md hover:bg-gray-200 flex items-center gap-1"
+                  className="px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 flex items-center gap-1"
                   title="Edit Departments"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -778,6 +880,23 @@ export default function SundaySchedule({ token, isSuperUser, departments, curren
         </div>
       )}
 
+      {/* Conflict warning banner */}
+      {viewTab === 'all' && conflictList.length > 0 && (
+        <div className="mb-4 rounded-lg border border-red-400 bg-red-50 p-4">
+          <div className="flex items-center gap-2 text-sm font-semibold text-red-700">
+            <span aria-hidden>⚠️</span>
+            <span>{conflictList.length} scheduling conflict{conflictList.length > 1 ? 's' : ''} — a person can&apos;t be in two places at the same time</span>
+          </div>
+          <ul className="mt-2 space-y-1 text-xs text-red-700">
+            {conflictList.map((c, i) => (
+              <li key={i}>
+                • <strong>{c.name}</strong> is assigned to <strong>{c.depts.join(' and ')}</strong> during <strong>{c.phase}</strong>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* Schedule Grid (All Posts) */}
       {viewTab === 'all' && (
       <div className="bg-white rounded-lg shadow-sm overflow-hidden">
@@ -807,105 +926,185 @@ export default function SundaySchedule({ token, isSuperUser, departments, curren
                   {config.departments.map((dept) => {
                     const isEditing = editingCell?.phase === phase && editingCell?.dept === dept;
                     const value = getSlotValue(phase, dept);
+                    const conflicts = getCellConflicts(phase, dept);
+                    const hasConflict = conflicts.length > 0;
 
                     return (
                       <td
                         key={`${phase}-${dept}`}
                         className={`px-2 py-1 text-xs border-r border-b ${
-                          canEdit ? 'cursor-pointer hover:bg-blue-50' : ''
-                        } ${isEditing ? 'bg-blue-100 relative' : ''}`}
+                          isEditing ? 'bg-blue-100 relative' : canEdit ? 'cursor-pointer hover:bg-blue-50' : ''
+                        }`}
+                        title={hasConflict ? conflicts.map(c => `${c.name} also in ${c.otherDepts.join(', ')} this phase`).join('\n') : undefined}
                         onClick={() => !isEditing && startEditing(phase, dept)}
                       >
                         {isEditing ? (
                           <div className="relative" onClick={(e) => e.stopPropagation()}>
-                            {/* Free-form text area */}
-                            <textarea
-                              value={cellValue}
-                              onChange={(e) => setCellValue(e.target.value)}
-                              placeholder="Enter text (e.g., BREAKDOWN: GEORGIA/LISA)"
-                              className="w-full min-w-[200px] px-2 py-1 text-xs border border-blue-400 rounded bg-white text-gray-900 resize-none"
-                              rows={3}
-                              autoFocus
-                            />
-
-                            {/* Quick add user button */}
-                            <div className="mt-1">
-                              <button
-                                type="button"
-                                onClick={() => setShowUserDropdown(!showUserDropdown)}
-                                className="text-xs text-blue-600 hover:text-blue-800"
-                              >
-                                + Quick add user
-                              </button>
-                            </div>
-
-                            {/* User dropdown with search */}
-                            {showUserDropdown && (
-                              <div className="absolute left-0 mt-1 w-56 bg-white border border-gray-300 rounded-md shadow-lg z-20">
-                                {/* Search input */}
-                                <div className="p-2 border-b">
+                            {(() => {
+                              const query = userSearchQuery.trim().toLowerCase();
+                              const deptUsers = usersForDept(dept);
+                              const filteredUsers = query
+                                ? deptUsers.filter(user =>
+                                    user.name.toLowerCase().includes(query) ||
+                                    user.email.toLowerCase().includes(query)
+                                  )
+                                : deptUsers;
+                              // Names already in this cell (one per line)
+                              const assignedNames = new Set(
+                                cellValue.split('\n').map(s => s.trim().toLowerCase()).filter(Boolean)
+                              );
+                              const addUserToCell = (user: UserOption) => {
+                                // Don't allow the same person twice in one cell
+                                if (assignedNames.has(user.name.toLowerCase())) {
+                                  toast(`${user.name} is already added`, { icon: 'ℹ️' });
+                                  setUserSearchQuery('');
+                                  setHighlightIndex(0);
+                                  return;
+                                }
+                                // Conflict: already assigned to another department in this same phase
+                                const otherDepts = config.departments.filter(d =>
+                                  d !== dept && getSlotValue(phase, d).toLowerCase().includes(user.name.toLowerCase())
+                                );
+                                if (otherDepts.length > 0) {
+                                  toast.error(
+                                    `Conflict: ${user.name} is already assigned to ${otherDepts.join(', ')} during "${phase}". A person can't be in two places at the same time.`,
+                                    { duration: 6000 }
+                                  );
+                                }
+                                const newValue = cellValue.trim() ? `${cellValue.trim()}\n${user.name}` : user.name;
+                                setCellValue(newValue);
+                                setUserSearchQuery('');
+                                setHighlightIndex(0);
+                                // Save immediately, keep editor open so more names can be added
+                                persistCellValue(newValue, false);
+                              };
+                              return (
+                                <>
+                                  {/* Type-to-search user picker */}
                                   <input
                                     type="text"
                                     value={userSearchQuery}
-                                    onChange={(e) => setUserSearchQuery(e.target.value)}
-                                    placeholder="Search users..."
-                                    className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900"
-                                  />
-                                </div>
-                                <div className="max-h-32 overflow-y-auto">
-                                  {users.length === 0 ? (
-                                    <div className="p-2 text-xs text-gray-500">No users available</div>
-                                  ) : (
-                                    (() => {
-                                      const filteredUsers = users.filter(user =>
-                                        user.name.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
-                                        user.email.toLowerCase().includes(userSearchQuery.toLowerCase())
-                                      );
-                                      if (filteredUsers.length === 0) {
-                                        return <div className="p-2 text-xs text-gray-500">No users matching &quot;{userSearchQuery}&quot;</div>;
+                                    autoFocus
+                                    onChange={(e) => { setUserSearchQuery(e.target.value); setHighlightIndex(0); }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'ArrowDown' && filteredUsers.length > 0) {
+                                        e.preventDefault();
+                                        setHighlightIndex(i => Math.min(filteredUsers.length - 1, i + 1));
+                                      } else if (e.key === 'ArrowUp' && filteredUsers.length > 0) {
+                                        e.preventDefault();
+                                        setHighlightIndex(i => Math.max(0, i - 1));
+                                      } else if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        // Only add on Enter when the user has typed a query (avoids
+                                        // accidentally adding the first person on an empty box).
+                                        if (query && filteredUsers.length > 0) {
+                                          const sel = filteredUsers[Math.min(highlightIndex, filteredUsers.length - 1)];
+                                          if (sel) addUserToCell(sel);
+                                        } else {
+                                          saveCell();
+                                        }
+                                      } else if (e.key === 'Escape') {
+                                        e.preventDefault();
+                                        if (query) { setUserSearchQuery(''); setHighlightIndex(0); }
+                                        else cancelEditing();
                                       }
-                                      return filteredUsers.map((user) => (
-                                        <button
-                                          key={user.id}
-                                          type="button"
-                                          onClick={() => {
-                                            // Append user name to cell value
-                                            setCellValue(prev => prev ? `${prev} ${user.name}` : user.name);
-                                            setShowUserDropdown(false);
-                                            setUserSearchQuery('');
-                                          }}
-                                          className="w-full text-left px-3 py-2 text-xs hover:bg-gray-100 text-gray-700"
-                                        >
-                                          {user.name}
-                                        </button>
-                                      ));
-                                    })()
-                                  )}
-                                </div>
-                              </div>
-                            )}
+                                    }}
+                                    placeholder="Type a name, Enter to add…"
+                                    className="w-full min-w-[220px] px-2 py-1 text-xs border border-blue-400 rounded bg-white text-gray-900"
+                                  />
 
-                            {/* Action buttons */}
-                            <div className="flex gap-1 mt-1">
-                              <button
-                                type="button"
-                                onClick={saveCell}
-                                className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
-                              >
-                                Save
-                              </button>
-                              <button
-                                type="button"
-                                onClick={cancelEditing}
-                                className="px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
-                              >
-                                Cancel
-                              </button>
-                            </div>
+                                  {/* User list (always visible while editing; all dept users when empty) */}
+                                  <div className="mt-1 bg-white border border-gray-300 rounded-md shadow-sm max-h-56 overflow-y-auto">
+                                    {filteredUsers.length === 0 ? (
+                                      <div className="p-2 text-xs text-gray-500">
+                                        {query
+                                          ? `No users matching "${userSearchQuery}"`
+                                          : 'No users in this department'}
+                                      </div>
+                                    ) : (
+                                      filteredUsers.map((user, idx) => {
+                                        const alreadyAdded = assignedNames.has(user.name.toLowerCase());
+                                        // Is this person already booked elsewhere in this phase?
+                                        const busyIn = config.departments.filter(d =>
+                                          d !== dept && getSlotValue(phase, d).toLowerCase().includes(user.name.toLowerCase())
+                                        );
+                                        const available = busyIn.length === 0;
+                                        return (
+                                          <button
+                                            key={user.id}
+                                            type="button"
+                                            disabled={alreadyAdded}
+                                            onMouseDown={(e) => e.preventDefault()}
+                                            onMouseEnter={() => !alreadyAdded && setHighlightIndex(idx)}
+                                            onClick={() => addUserToCell(user)}
+                                            className={`w-full flex items-center justify-between gap-2 px-3 py-2 text-xs text-left ${
+                                              alreadyAdded
+                                                ? 'opacity-50 cursor-not-allowed'
+                                                : idx === highlightIndex
+                                                ? 'bg-blue-100'
+                                                : 'hover:bg-gray-100'
+                                            }`}
+                                          >
+                                            <span className="text-gray-800">{user.name}</span>
+                                            {alreadyAdded ? (
+                                              <span className="text-gray-400 whitespace-nowrap">✓ Added</span>
+                                            ) : available ? (
+                                              <span className="text-green-600 whitespace-nowrap">Available</span>
+                                            ) : (
+                                              <span className="text-red-600 whitespace-nowrap">in {busyIn.join(', ')}</span>
+                                            )}
+                                          </button>
+                                        );
+                                      })
+                                    )}
+                                  </div>
+
+                                  {/* Assigned people / free-form notes */}
+                                  <textarea
+                                    value={cellValue}
+                                    onChange={(e) => setCellValue(e.target.value)}
+                                    placeholder="Assigned people / notes (e.g., BREAKDOWN: GEORGIA/LISA)"
+                                    className="w-full min-w-[220px] mt-1 px-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-900 resize-none"
+                                    rows={3}
+                                  />
+
+                                  {/* Action buttons */}
+                                  <div className="flex gap-1 mt-1">
+                                    <button
+                                      type="button"
+                                      onClick={saveCell}
+                                      className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+                                    >
+                                      Save
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={cancelEditing}
+                                      className="px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                </>
+                              );
+                            })()}
                           </div>
                         ) : (
-                          <div className="min-h-[40px] whitespace-pre-wrap text-gray-700">
-                            {value || <span className="text-gray-300">-</span>}
+                          <div className="min-h-[40px] whitespace-pre-wrap">
+                            {value ? (
+                              value.split('\n').map((line, i) => {
+                                const isConflictLine = conflicts.some(c =>
+                                  line.toLowerCase().includes(c.name.toLowerCase())
+                                );
+                                return (
+                                  <div key={i} className={isConflictLine ? 'text-red-600 font-semibold' : 'text-gray-700'}>
+                                    {line || ' '}
+                                  </div>
+                                );
+                              })
+                            ) : (
+                              <span className="text-gray-300">-</span>
+                            )}
                           </div>
                         )}
                       </td>
@@ -924,10 +1123,11 @@ export default function SundaySchedule({ token, isSuperUser, departments, curren
         <div className="bg-white p-4 rounded-lg shadow-sm">
           <h3 className="text-sm font-semibold text-gray-700 mb-2">Instructions</h3>
           <ul className="text-xs text-gray-600 space-y-1">
-            <li>• Click on any cell to edit the assigned person(s)</li>
-            <li>• Click &quot;+ Add user&quot; to select members from the dropdown</li>
-            <li>• Click Save to confirm or Cancel to discard changes</li>
-            <li>• Use arrows to navigate between Sundays</li>
+            <li>• Click a cell, then type a name — matches appear as you type</li>
+            <li>• Use ↑/↓ to choose and press Enter to add the person — it saves automatically</li>
+            <li>• Keep typing to add more people; Esc clears the search</li>
+            <li>• Edit the text box below for free-form notes (e.g., BREAKDOWN: GEORGIA/LISA), then click Save</li>
+            <li>• Use the arrows at the top to navigate between Sundays</li>
           </ul>
         </div>
       )}
