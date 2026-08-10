@@ -14,8 +14,9 @@ import NotificationBell from '@/components/NotificationBell';
 import MeetingsList from '@/components/MeetingsList';
 import CreateMeetingModal from '@/components/CreateMeetingModal';
 import InstallPrompt from '@/components/InstallPrompt';
+import { APP_LINKS } from '@/lib/apps';
 
-type Tab = 'departments' | 'users' | 'projects' | 'invites' | 'schedule' | 'meetings';
+type Tab = 'departments' | 'users' | 'projects' | 'invites' | 'schedule' | 'meetings' | 'apps';
 
 interface Invite {
   id: string;
@@ -38,7 +39,7 @@ export default function DashboardPage() {
   // Handle tab parameter from URL (for notification navigation)
   useEffect(() => {
     const tabParam = searchParams.get('tab');
-    if (tabParam && ['departments', 'users', 'projects', 'invites', 'schedule', 'meetings'].includes(tabParam)) {
+    if (tabParam && ['departments', 'users', 'projects', 'invites', 'schedule', 'meetings', 'apps'].includes(tabParam)) {
       setActiveTab(tabParam as Tab);
     }
   }, [searchParams]);
@@ -576,6 +577,12 @@ export default function DashboardPage() {
           >
             Meetings
           </button>
+          <button
+            onClick={() => setActiveTab('apps')}
+            className={`pb-2 px-3 md:px-4 whitespace-nowrap text-sm md:text-base ${activeTab === 'apps' ? 'border-b-2 border-blue-600 text-blue-600 font-medium' : 'text-gray-600'}`}
+          >
+            Apps
+          </button>
         </div>
       </div>
 
@@ -621,6 +628,46 @@ export default function DashboardPage() {
             refreshTrigger={meetingsRefreshTrigger}
           />
         )}
+
+        {/* Apps Tab */}
+        {activeTab === 'apps' && (() => {
+          const visibleApps = APP_LINKS.filter(app =>
+            user.isSuperUser ||
+            app.departments === null ||
+            departments.some(d =>
+              app.departments!.includes(d.name) &&
+              ((d.memberIds || []).includes(user.id) || (d.adminIds || []).includes(user.id))
+            )
+          );
+          return (
+            <div>
+              <h2 className="text-lg font-semibold mb-4">Church Apps</h2>
+              {visibleApps.length === 0 ? (
+                <p className="text-gray-500 text-sm">
+                  No apps available for your departments yet.
+                </p>
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {visibleApps.map(app => (
+                    <a
+                      key={app.name}
+                      href={app.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-400 hover:shadow-sm transition"
+                    >
+                      <div className="font-medium text-gray-900">{app.name}</div>
+                      <div className="mt-1 text-sm text-gray-500">{app.description}</div>
+                      <div className="mt-2 text-xs text-gray-400">
+                        {app.departments ? app.departments.join(', ') : 'Everyone'}
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {loadingData ? (
           <div className="text-center py-8">
