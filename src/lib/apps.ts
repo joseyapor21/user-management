@@ -1,7 +1,7 @@
 // Church app launcher entries shown on the dashboard "Apps" tab.
 // `departments: null` = visible to every signed-in user; otherwise visible to
-// superusers and to members/admins of any listed department (matched by the
-// exact v5departments name).
+// members/admins of any listed department (matched by the exact v5departments
+// name). Superusers additionally get an "Other apps" section with the rest.
 export interface AppLink {
   name: string;
   description: string;
@@ -45,5 +45,29 @@ export const APP_LINKS: AppLink[] = [
     description: 'Provisions department',
     url: 'https://provisions.ccoan-newyork.org',
     departments: ['Provisions Department'],
+  },
+  {
+    name: 'HadBreak',
+    description: 'Church video sharing & downloads',
+    url: 'https://hadbreak.ccoan-newyork.org',
+    departments: ['Edit Department', 'Media Department', 'Camera Department'],
+  },
+  {
+    name: 'Camera Switcher',
+    description: 'Livestream camera switching',
+    url: 'https://switch.ccoan-newyork.org',
+    departments: ['Camera Department', 'Media Department'],
+  },
+  {
+    name: 'Transfer',
+    description: 'Large file transfer',
+    url: 'https://transfer.ccoan-newyork.org',
+    departments: ['Edit Department', 'Media Department'],
+  },
+  {
+    name: 'Kitchen Ledger',
+    description: 'Shared kitchen costs',
+    url: 'https://kitchen.ccoan-newyork.org',
+    departments: ['Kitchen Department', 'Girls Apartment', 'Boyz Apartment'],
   },
 ];

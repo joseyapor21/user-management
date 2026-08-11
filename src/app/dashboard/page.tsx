@@ -631,39 +631,53 @@ export default function DashboardPage() {
 
         {/* Apps Tab */}
         {activeTab === 'apps' && (() => {
-          const visibleApps = APP_LINKS.filter(app =>
-            user.isSuperUser ||
+          // Everyone (superusers included) sees the apps of the departments
+          // they belong to; superusers get the remaining apps in a second
+          // section so they can still reach everything.
+          const inMyDepartments = (app: (typeof APP_LINKS)[number]) =>
             app.departments === null ||
             departments.some(d =>
               app.departments!.includes(d.name) &&
               ((d.memberIds || []).includes(user.id) || (d.adminIds || []).includes(user.id))
-            )
+            );
+          const myApps = APP_LINKS.filter(inMyDepartments);
+          const otherApps = user.isSuperUser ? APP_LINKS.filter(a => !inMyDepartments(a)) : [];
+          const AppCard = ({ app }: { app: (typeof APP_LINKS)[number] }) => (
+            <a
+              href={app.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-400 hover:shadow-sm transition"
+            >
+              <div className="font-semibold text-gray-900">{app.name}</div>
+              <div className="mt-1 text-sm text-gray-700">{app.description}</div>
+              <div className="mt-2 text-xs text-gray-500">
+                {app.departments ? app.departments.join(', ') : 'Everyone'}
+              </div>
+            </a>
           );
           return (
             <div>
-              <h2 className="text-lg font-semibold mb-4">Church Apps</h2>
-              {visibleApps.length === 0 ? (
-                <p className="text-gray-500 text-sm">
-                  No apps available for your departments yet.
+              <h2 className="text-lg font-semibold mb-4 text-gray-900">Your apps</h2>
+              {myApps.length === 0 ? (
+                <p className="text-gray-700 text-sm">
+                  No apps for your departments yet. Ask a superuser to add you
+                  to the right department.
                 </p>
               ) : (
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {visibleApps.map(app => (
-                    <a
-                      key={app.name}
-                      href={app.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-400 hover:shadow-sm transition"
-                    >
-                      <div className="font-medium text-gray-900">{app.name}</div>
-                      <div className="mt-1 text-sm text-gray-500">{app.description}</div>
-                      <div className="mt-2 text-xs text-gray-400">
-                        {app.departments ? app.departments.join(', ') : 'Everyone'}
-                      </div>
-                    </a>
-                  ))}
+                  {myApps.map(app => <AppCard key={app.name} app={app} />)}
                 </div>
+              )}
+              {otherApps.length > 0 && (
+                <>
+                  <h2 className="text-lg font-semibold mt-8 mb-4 text-gray-900">
+                    Other apps <span className="text-sm font-normal text-gray-500">(visible to you as superuser)</span>
+                  </h2>
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {otherApps.map(app => <AppCard key={app.name} app={app} />)}
+                  </div>
+                </>
               )}
             </div>
           );
