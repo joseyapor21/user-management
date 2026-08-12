@@ -65,6 +65,12 @@ export const APP_LINKS: AppLink[] = [
     departments: ['Edit Department', 'Media Department'],
   },
   {
+    name: 'Transport',
+    description: 'Trip miles & price calculator, trip log',
+    url: 'https://transport.ccoan-newyork.org',
+    departments: ['Transportation Department'],
+  },
+  {
     name: 'Kitchen Ledger',
     description: 'Shared kitchen costs',
     url: 'https://kitchen.ccoan-newyork.org',
